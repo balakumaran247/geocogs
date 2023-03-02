@@ -11,6 +11,7 @@ image_col = {
     'dynamicworld': ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1"),
     'co-efficient of variation(rain)': ee.ImageCollection("users/jaltol/realwater/cvRainfall"),
     'S2': ee.ImageCollection("COPERNICUS/S2"),
+    'ET(IITB)': ee.ImageCollection('users/jaltol/ET_new/IITB'),
 }
 
 feature_col = {

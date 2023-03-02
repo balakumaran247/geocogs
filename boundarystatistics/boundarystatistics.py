@@ -30,7 +30,8 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
                 'soil moisture',
                 'groundwater',
                 'co-efficient of variation(rain)',
-                'NDVI']
+                'NDVI',
+                'ET(IITB)']
     
     def initAlgorithm(self, config=None):
         # input of Polygon Layer
