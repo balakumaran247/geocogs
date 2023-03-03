@@ -1,4 +1,10 @@
 # Changelog
+## v0.7
+### Feature
+- added IITB ET product in boundary statistics
+- added version and update availability in About
+### Fix
+- Point shapefile as input layer
 ## v0.6
 ### Feature
 - added NDVI in boundary statistics
@@ -12,7 +18,7 @@
 ### Feature
 - added soil moisture, groundwater in boundary statistics
 ## v0.2
-### fix
+### Fix
 - mask out no_data
 ## v0.1
 ### Feature
