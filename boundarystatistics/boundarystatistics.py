@@ -39,7 +39,7 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
                 self.tr('Input layer'),
-                [QgsProcessing.TypeVectorPolygon]
+                [QgsProcessing.TypeVectorPolygon, QgsProcessing.TypeVectorPoint]
             )
         )
 
