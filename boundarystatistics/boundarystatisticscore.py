@@ -1,4 +1,5 @@
 from ..geeassets import image_col, stat_dict, expression_dict, mask_s2_clouds
+from .boundarystatisticsutils import get_IITB_dr
 import pandas as pd
 import numpy as np
 import ee
@@ -29,26 +30,38 @@ class BoundaryWiseStats:
 
     def make_date_range_list(self, span): 
         if self.temporal_step == 'Monthly' and span == 'hydrological year':
-            # list of months in hydro year - [6,..,12,1,..,5]
-            months1 = ee.List.sequence(6,12)
-            months2 = ee.List.sequence(1,5)
-            dr1 = months1.map(
-                lambda m: ee.Date.fromYMD(self.year,m,1).getRange('month'))
-            dr2 = months2.map(
-                lambda m: ee.Date.fromYMD(self.year+1,m,1).getRange('month'))
-            self.drl = dr1.cat(dr2)
+            if self.dataset == 'ET(IITB)':
+                self.drl = get_IITB_dr(self.year, 'hyd_month')
+            else:
+                # list of months in hydro year - [6,..,12,1,..,5]
+                months1 = ee.List.sequence(6,12)
+                months2 = ee.List.sequence(1,5)
+                dr1 = months1.map(
+                    lambda m: ee.Date.fromYMD(self.year,m,1).getRange('month'))
+                dr2 = months2.map(
+                    lambda m: ee.Date.fromYMD(self.year+1,m,1).getRange('month'))
+                self.drl = dr1.cat(dr2)
         elif self.temporal_step == 'Yearly' and span == 'hydrological year':
-            start = ee.Date.fromYMD(self.year,6,1)
-            end = ee.Date.fromYMD(self.year+1,6,1)
-            self.drl = ee.List([ee.DateRange(start,end)])
+            if self.dataset == 'ET(IITB)':
+                self.drl = get_IITB_dr(self.year, 'hyd_year')
+            else:
+                start = ee.Date.fromYMD(self.year,6,1)
+                end = ee.Date.fromYMD(self.year+1,6,1)
+                self.drl = ee.List([ee.DateRange(start,end)])
         elif self.temporal_step == 'Yearly' and span == 'calendar year':
-            start = ee.Date.fromYMD(self.year,1,1)
-            end = ee.Date.fromYMD(self.year+1,1,1)
-            self.drl = ee.List([ee.DateRange(start,end)])
+            if self.dataset == 'ET(IITB)':
+                self.drl = get_IITB_dr(self.year, 'cal_year')
+            else:
+                start = ee.Date.fromYMD(self.year,1,1)
+                end = ee.Date.fromYMD(self.year+1,1,1)
+                self.drl = ee.List([ee.DateRange(start,end)])
         elif self.temporal_step == 'Monthly' and span == 'calendar year':
-            months = ee.List.sequence(1,12)
-            self.drl = months.map(
-                lambda m: ee.Date.fromYMD(self.year,m,1).getRange('month'))
+            if self.dataset == 'ET(IITB)':
+                self.drl = get_IITB_dr(self.year, 'cal_month')
+            else:
+                months = ee.List.sequence(1,12)
+                self.drl = months.map(
+                    lambda m: ee.Date.fromYMD(self.year,m,1).getRange('month'))
         else:
             raise QgsProcessingException('DateRange could not be acquired')
     
@@ -87,7 +100,25 @@ class BoundaryWiseStats:
                 'system:time_start', start.millis()).set(
                 'system:time_end', end.millis()))
             return ee.Image(mimages_reduced.updateMask(mimages_reduced.gte(0)))
-        self.iColl_reduced = self.drl.map(temp_reduce_image)
+        def temp_reduce_IITBET(dr):
+            IC_comb = ee.ImageCollection([])
+            timestamp = None
+            for ix, ele in enumerate(dr):
+                start, end, coeff = ele
+                mimages = self.iColl_filtered.filter(ee.Filter.date(start, end)).select(0)
+                if ix == 1:
+                    timestamp = ee.Image(mimages.first()).get('system:time_start')
+                mimages = mimages.map(
+                    lambda x: (x.multiply(coeff)).updateMask(x.multiply(coeff).gte(0))
+                )
+                IC_comb = IC_comb.merge(mimages)
+            mimages_reduced = IC_comb.reduce(self.tempReducer)
+            mimages_reduced = ee.Image(mimages_reduced.set('system:time_start', timestamp))
+            return ee.Image(mimages_reduced.updateMask(mimages_reduced.gte(0)))
+        if self.dataset == 'ET(IITB)':
+            self.iColl_reduced = ee.List(list(map(temp_reduce_IITBET, self.drl)))
+        else:
+            self.iColl_reduced = self.drl.map(temp_reduce_image)
         
     def get_boundarywisestats(self):
         self.bws = self.iColl_reduced.map(
