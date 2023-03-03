@@ -30,7 +30,8 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
                 'soil moisture',
                 'groundwater',
                 'co-efficient of variation(rain)',
-                'NDVI']
+                'NDVI',
+                'ET(IITB)']
     
     def initAlgorithm(self, config=None):
         # input of Polygon Layer
@@ -38,7 +39,7 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
             QgsProcessingParameterFeatureSource(
                 self.INPUT,
                 self.tr('Input layer'),
-                [QgsProcessing.TypeVectorPolygon]
+                [QgsProcessing.TypeVectorPolygon, QgsProcessing.TypeVectorPoint]
             )
         )
 

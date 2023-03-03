@@ -1,4 +1,4 @@
-"""csei-tools QGIS plugin - Boundary Statistics tool
+"""GeoCogs QGIS plugin - Boundary Statistics tool
 This script will help run the tool as batch process for
 different shape files and no. of years.
 """
@@ -16,7 +16,7 @@ out_directory = r'C:\Users\atree\Desktop\CSV'
 years = [2015, 2016]
 parameters = {
     'COLNAME': 'id',  # unique field name
-    'PARAMETER': 3, # ET 3, NDVI 7
+    'PARAMETER': 3,
     'SPAN': 0, # Calendar 0, Hydrological 1
     'SPATIALSTAT': 0, # mean 0, median 1
     'TEMPORALSTAT': 0, # mean 0, median 1
@@ -35,7 +35,7 @@ for year in years:
             output_csv = os.path.join(
                 out_path, f'{os.path.splitext(file)[0]}.csv')
             parameters.update(INPUT=input_shp, OUTPUT=output_csv, YEAR=year)
-            processing.run("csei:boundary_stats", parameters)
+            processing.run("geocogs:boundary_stats", parameters)
             print(f'{year} : {output_csv}')
 
 print('completed!!!')

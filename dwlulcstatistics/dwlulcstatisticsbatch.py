@@ -1,4 +1,4 @@
-"""csei-tools QGIS plugin - LULC Statistics tool
+"""GeoCogs QGIS plugin - LULC Statistics tool
 This script will help run the tool as batch process for
 different shape files and no. of years.
 """
@@ -31,7 +31,7 @@ for year in years:
             output_csv = os.path.join(
                 out_path, f'{os.path.splitext(file)[0]}.csv')
             parameters.update(INPUT=input_shp, OUTPUT=output_csv, YEAR=year)
-            processing.run("csei:lulc_stats", parameters)
+            processing.run("geocogs:lulc_stats", parameters)
             print(f'output file: {output_csv}')
 
 print('completed!!!')
