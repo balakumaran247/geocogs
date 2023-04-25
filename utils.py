@@ -9,6 +9,7 @@ import ee
 ee.Initialize()
 from .geeassets import feature_col, image_col, stat_dict
 from typing import Tuple, Optional
+import calendar
 
 dw_class_ordered = ('water',
     'trees',
@@ -71,6 +72,17 @@ def set_progressbar_perc(feedback: QgsFeedback, perc: int) -> None:
         raise QgsProcessingException('Processing Canceled.')
     feedback.setProgress(perc)
 
+def month_days(year: int, month: int) -> int:
+    """get the no. of days in a month
+
+    Args:
+        year (int): input year
+        month (int): input month
+
+    Returns:
+        int: no. of days in the month
+    """
+    return calendar.monthrange(year, month)[1]
 class GeoCogsBase:
     def __init__(self, **kwargs) -> None:
         '''
@@ -101,9 +113,14 @@ class GeoCogsBase:
         start_date: int = 1,
         end_date: int = 1
         '''
+        def check_geocogs(param: str) -> int:
+            try:
+                return self.geocogs[param]
+            except Exception:
+                return 0
         iargs = {
-            'start_year': kwargs.get('start_year', self.geocogs['year']),
-            'end_year': kwargs.get('end_year', self.geocogs['year'] + 1),
+            'start_year': kwargs.get('start_year', max(check_geocogs('year'), check_geocogs('start_year'))),
+            'end_year': kwargs.get('end_year', max(check_geocogs('year')+1, check_geocogs('end_year'))),
             'start_month': kwargs.get('start_month', 6),
             'end_month': kwargs.get('end_month', 6),
             'start_date': kwargs.get('start_date', 1),
@@ -130,6 +147,8 @@ class GeoCogsBase:
     
     def filter_image_coll(self, **kwargs) -> ee.ImageCollection:
         '''
+        iColl (ee.ImageCollection) Optional
+        -------------------------
         date_range (ee.DateRange)
         --------OR-------------
         start_ee_date (ee.Date)
