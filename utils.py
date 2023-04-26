@@ -8,7 +8,7 @@ import json
 import ee
 ee.Initialize()
 from .geeassets import feature_col, image_col, stat_dict
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 import calendar
 
 dw_class_ordered = ('water',
@@ -84,50 +84,54 @@ def month_days(year: int, month: int) -> int:
     """
     return calendar.monthrange(year, month)[1]
 class GeoCogsBase:
-    def __init__(self, **kwargs) -> None:
-        '''
+    def __init__(
+        self,
         featureCol,
         dataset,
-        year,
-        start_year,
-        end_year,
-        start_month,
-        end_month,
-        spatial_stat,
-        temporal_stat,
-        temporal_step,
-        col_name
-        '''
-        self.geocogs = kwargs
+        year = None,
+        start_year = None,
+        end_year = None,
+        start_month = None,
+        end_month = None,
+        spatial_stat = None,
+        temporal_stat = None,
+        temporal_step = None,
+        col_name = None
+        ) -> None:
+        self.featureCol = featureCol
+        self.dataset = dataset
+        self.year = year
+        self.start_year = start_year
+        self.end_year = end_year
+        self.start_month = start_month
+        self.end_month = end_month
+        self.spatial_stat = spatial_stat
+        self.temporal_stat = temporal_stat
+        self.temporal_step = temporal_step
+        self.col_name = col_name
+        if self.year is None and (self.start_year is None or self.end_year is None):
+            raise(ValueError("Start and End Years or Year expected."))
     
     def set_image_coll(self, dataset: Optional[str] = None) -> ee.ImageCollection:
-        self.iColl = image_col[dataset] if dataset else image_col[self.geocogs['dataset']]
+        self.iColl = image_col[dataset] if dataset else image_col[self.dataset]
         return self.iColl
     
-    def get_date_range(self, **kwargs) -> ee.DateRange:
-        '''
-        start_year: int,
+    def get_date_range(
+        self,
+        year: int,
         end_year: Optional[int] = None,
         start_month: int = 6,
         end_month: int = 6,
         start_date: int = 1,
-        end_date: int = 1
-        '''
-        def check_geocogs(param: str) -> int:
-            try:
-                return self.geocogs[param]
-            except Exception:
-                return 0
-        iargs = {
-            'start_year': kwargs.get('start_year', max(check_geocogs('year'), check_geocogs('start_year'))),
-            'end_year': kwargs.get('end_year', max(check_geocogs('year')+1, check_geocogs('end_year'))),
-            'start_month': kwargs.get('start_month', 6),
-            'end_month': kwargs.get('end_month', 6),
-            'start_date': kwargs.get('start_date', 1),
-            'end_date': kwargs.get('end_date', 1),
-        }
-        start = ee.Date.fromYMD(iargs['start_year'], iargs['start_month'], iargs['start_date'])
-        end = ee.Date.fromYMD(iargs['end_year'], iargs['end_month'], iargs['end_date'])
+        end_date: int = 1,
+        extend: bool = False
+        ) -> ee.DateRange:
+        if end_year is None:
+            end_year = year
+        start = ee.Date.fromYMD(year, start_month, start_date)
+        end = ee.Date.fromYMD(end_year, end_month, end_date)
+        if extend:
+            end = end.advance(1, 'day')
         return ee.DateRange(start,end)
     
     def generate_proj_scale(
@@ -145,36 +149,43 @@ class GeoCogsBase:
             self.proj = sample_image.projection()
         self.scale = scale or self.proj.nominalScale()
     
-    def filter_image_coll(self, **kwargs) -> ee.ImageCollection:
-        '''
-        iColl (ee.ImageCollection) Optional
-        -------------------------
-        date_range (ee.DateRange)
-        --------OR-------------
-        start_ee_date (ee.Date)
-        end_ee_date (ee.Date)
-        '''
-        iColl = kwargs.get('iColl', self.iColl)
-        if 'date_range' in kwargs:
-            return iColl.filterDate(kwargs['date_range'])
+    def filter_image_coll(
+        self,
+        iColl: Optional[ee.ImageCollection] = None,
+        date_range: Optional[ee.DateRange] = None,
+        start_ee_date: Optional[ee.Date] = None,
+        end_ee_date: Optional[ee.Date] = None) -> ee.ImageCollection:
+        if iColl is None:
+            try:
+                iColl = self.iColl
+            except NameError as e:
+                raise (NameError('Image Collection is not found.')).with_traceback(
+                    e.__traceback__
+                ) from e
+        if date_range is None and (start_ee_date is None or end_ee_date is None):
+            raise(ValueError("Start and End Dates or Date Range expected."))
+        if date_range:
+            return iColl.filterDate(date_range)
         else:
-            return iColl.filter(ee.Filter.date(kwargs['start_ee_date'], kwargs['end_ee_date']))
+            return iColl.filter(ee.Filter.date(start_ee_date, end_ee_date))
     
-    def spatial_reduce(self, image: ee.Image, reducer_str: str, boundary: Optional[ee.Geometry] = None) -> ee.FeatureCollection:
+    def spatial_reduce_setup(self, reducer_str: str, boundary: Optional[ee.Geometry] = None) -> Callable:
         if boundary is None:
-            boundary = self.geocogs['featureCol']
-        return image.reduceRegions(
+            boundary = self.featureCol
+        def spatial_reduce(image: ee.Image) -> ee.FeatureCollection:
+            return ee.Image(image).reduceRegions(
                 collection= boundary,
                 reducer= stat_dict[reducer_str],
                 scale= self.scale,
                 crs= self.proj
-            ).set(
-                "year",
-                ee.Date(ee.Image(image).get("system:time_start")).get('year')
                 ).set(
-                "month",
-                ee.Date(ee.Image(image).get("system:time_start")).get('month')
-                ).set(
-                "day",
-                ee.Date(ee.Image(image).get("system:time_start")).get('day')
+                    "year",
+                    ee.Date(ee.Image(image).get("system:time_start")).get('year')
+                    ).set(
+                    "month",
+                    ee.Date(ee.Image(image).get("system:time_start")).get('month')
+                    ).set(
+                    "day",
+                    ee.Date(ee.Image(image).get("system:time_start")).get('day')
                 )
+        return spatial_reduce
