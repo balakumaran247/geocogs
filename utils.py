@@ -2,7 +2,7 @@ from qgis.core import (
     QgsJsonExporter,
     QgsVectorLayer,
     QgsProcessingException,
-    QgsFeedback
+    QgsProcessingFeedback
 )
 import json
 import ee
@@ -58,12 +58,16 @@ def get_admin_info(feature: ee.Feature) -> Tuple[str, str]:
     min_dist = dist_fc.sort('mindist', True).first().getInfo()
     return (min_dist['properties']['ST_NM'], min_dist['properties']['DISTRICT'])
 
-def set_progressbar_perc(feedback: QgsFeedback, perc: int) -> None:
+def set_progressbar_perc(
+    feedback: QgsProcessingFeedback,
+    perc: int,
+    text: Optional[str] = None) -> None:
     """Set the feedback percentage in Progess bar
 
     Args:
-        feedback (QgsFeedback): feadback object
+        feedback (QgsProcessingFeedback): feadback object
         perc (int): progressbar percentage to set
+        text (Optional[str]): progress text to set
 
     Raises:
         QgsProcessingException: Cancel button clicked
@@ -71,6 +75,8 @@ def set_progressbar_perc(feedback: QgsFeedback, perc: int) -> None:
     if feedback.isCanceled():
         raise QgsProcessingException('Processing Canceled.')
     feedback.setProgress(perc)
+    if text:
+        feedback.setProgressText(text)
 
 def month_days(year: int, month: int) -> int:
     """get the no. of days in a month
@@ -83,21 +89,38 @@ def month_days(year: int, month: int) -> int:
         int: no. of days in the month
     """
     return calendar.monthrange(year, month)[1]
+
+def logger(feedback: QgsProcessingFeedback, msg: str, console: bool = False) -> None:
+    """Log Informations. console used to report the output from executing an 
+    external command or subprocess.
+
+    Args:
+        feedback (QgsProcessingFeedback): feedback object
+        msg (str): text to log
+        console (bool, optional): True for ConsoleInfo. Defaults to False.
+    """
+    if console:
+        feedback.pushConsoleInfo(msg)
+    else:
+        feedback.pushInfo(msg)
+
 class GeoCogsBase:
+    """Base Class for the GeoCogs tool with common methods for processing
+    """
     def __init__(
         self,
-        featureCol,
-        dataset,
-        year = None,
-        start_year = None,
-        end_year = None,
-        start_month = None,
-        end_month = None,
-        spatial_stat = None,
-        temporal_stat = None,
-        temporal_step = None,
-        col_name = None
-        ) -> None:
+        featureCol: ee.FeatureCollection,
+        dataset: str,
+        year: Optional[int] = None,
+        start_year: Optional[int] = None,
+        end_year: Optional[int] = None,
+        start_month: Optional[int] = None,
+        end_month: Optional[int] = None,
+        spatial_stat: Optional[str] = None,
+        temporal_stat: Optional[str] = None,
+        temporal_step: Optional[str] = None,
+        col_name: Optional[str] = None,
+        **kwargs) -> None:
         self.featureCol = featureCol
         self.dataset = dataset
         self.year = year
@@ -109,10 +132,19 @@ class GeoCogsBase:
         self.temporal_stat = temporal_stat
         self.temporal_step = temporal_step
         self.col_name = col_name
+        self.kwargs = kwargs
         if self.year is None and (self.start_year is None or self.end_year is None):
             raise(ValueError("Start and End Years or Year expected."))
     
     def set_image_coll(self, dataset: Optional[str] = None) -> ee.ImageCollection:
+        """Set the Image Collection to be used based on the dataset argument
+
+        Args:
+            dataset (Optional[str], optional): dataset to use. Defaults to None.
+
+        Returns:
+            ee.ImageCollection: Image Collection related to the dataset
+        """
         self.iColl = image_col[dataset] if dataset else image_col[self.dataset]
         return self.iColl
     
@@ -126,6 +158,22 @@ class GeoCogsBase:
         end_date: int = 1,
         extend: bool = False
         ) -> ee.DateRange:
+        """Get the Date Range ee object for the input range. extend arg can be
+        used to extend the day by 1 (DateRange in filtering the last day is 
+        exclusive).
+
+        Args:
+            year (int): year or start year
+            end_year (Optional[int], optional): end year if different. Defaults to None.
+            start_month (int, optional): start month. Defaults to 6.
+            end_month (int, optional): end month. Defaults to 6.
+            start_date (int, optional): Start day. Defaults to 1.
+            end_date (int, optional): end day. Defaults to 1.
+            extend (bool, optional): extend by one day if True. Defaults to False.
+
+        Returns:
+            ee.DateRange: DateRange ee Object
+        """
         if end_year is None:
             end_year = year
         start = ee.Date.fromYMD(year, start_month, start_date)
@@ -140,6 +188,14 @@ class GeoCogsBase:
         band_id: int = 0,
         epsg_value: Optional[int] = None,
         scale: Optional[int] = None) -> None:
+        """generate the projection and scale arguments for the Image collection
+
+        Args:
+            iColl (Optional[ee.ImageCollection], optional): Image Collection. Defaults to None.
+            band_id (int, optional): id for band of image. Defaults to 0.
+            epsg_value (Optional[int], optional): EPSG value for projection. Defaults to None.
+            scale (Optional[int], optional): scale value. Defaults to None.
+        """
         if iColl is None:
             iColl = self.iColl
         sample_image = iColl.first().select(band_id)
@@ -147,7 +203,7 @@ class GeoCogsBase:
             self.proj = ee.Projection(f'EPSG:{epsg_value}')
         else:
             self.proj = sample_image.projection()
-        self.scale = scale or self.proj.nominalScale()
+        self.scale = scale if scale else self.proj.nominalScale()
     
     def filter_image_coll(
         self,
@@ -155,6 +211,17 @@ class GeoCogsBase:
         date_range: Optional[ee.DateRange] = None,
         start_ee_date: Optional[ee.Date] = None,
         end_ee_date: Optional[ee.Date] = None) -> ee.ImageCollection:
+        """filter image collection based on date range or start and end dates.
+
+        Args:
+            iColl (Optional[ee.ImageCollection], optional): Image Collection. Defaults to None.
+            date_range (Optional[ee.DateRange], optional): Date range ee object. Defaults to None.
+            start_ee_date (Optional[ee.Date], optional): start date ee object. Defaults to None.
+            end_ee_date (Optional[ee.Date], optional): end date ee object. Defaults to None.
+
+        Returns:
+            ee.ImageCollection: Filtered Image Collection
+        """
         if iColl is None:
             try:
                 iColl = self.iColl
@@ -169,13 +236,33 @@ class GeoCogsBase:
         else:
             return iColl.filter(ee.Filter.date(start_ee_date, end_ee_date))
     
-    def spatial_reduce_setup(self, reducer_str: str, boundary: Optional[ee.Geometry] = None) -> Callable:
+    def spatial_reduce_setup(self, spatial_stat: Optional[str] = None, boundary: Optional[ee.FeatureCollection] = None) -> Callable:
+        """setup to spatially Reduce image based on the spatial stat reducer
+        for the boundary to get a statistical output
+
+        Args:
+            spatial_stat (Optional[str], optional): spatial reducer. Defaults to None.
+            boundary (Optional[ee.FeatureCollection], optional): boundary. Defaults to None.
+
+        Returns:
+            Callable: function to spatial reduce images
+        """
         if boundary is None:
             boundary = self.featureCol
+        if spatial_stat is None:
+            spatial_stat = self.spatial_stat
         def spatial_reduce(image: ee.Image) -> ee.FeatureCollection:
+            """spatially reduce the input images
+
+            Args:
+                image (ee.Image): image to reduce
+
+            Returns:
+                ee.FeatureCollection: Reduced result as feature collection
+            """
             return ee.Image(image).reduceRegions(
                 collection= boundary,
-                reducer= stat_dict[reducer_str],
+                reducer= stat_dict[spatial_stat],
                 scale= self.scale,
                 crs= self.proj
                 ).set(
