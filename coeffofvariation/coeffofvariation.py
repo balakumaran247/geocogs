@@ -114,31 +114,53 @@ class CoeffVariationAlgorithm(QgsProcessingAlgorithm):
             raise QgsProcessingException('Unique Field Heading not available.')
         
         from .coeffofvariationcore import CoeffVariation
-        from ..utils import get_feature_collection, set_progressbar_perc
+        from ..utils import get_feature_collection, set_progressbar_perc, month_days, logger
 
-        set_progressbar_perc(feedback,1)
+        set_progressbar_perc(feedback,1,'Converting Layer to ee.FeatureCollection')
         f_col = get_feature_collection(source_lyr)
-        set_progressbar_perc(feedback,10)
+        set_progressbar_perc(feedback,10,'Fetch ee.ImageCollection')
         cv = CoeffVariation(
-            featureCol = source_lyr,
+            featureCol = f_col,
             dataset = param,
             start_year = start_year,
             end_year = end_year,
             start_month = start_month,
             end_month = end_month,
-            col_name = col_name
+            col_name = col_name,
+            feedback = feedback
         )
         cv.set_image_coll()
-        set_progressbar_perc(feedback,12)
+        set_progressbar_perc(feedback,12,'Fetch ee.DateRange')
         date_range = cv.get_date_range(
-            start_year = start_year,
+            year = start_year,
             end_year = end_year,
             start_month = start_month,
             end_month = end_month,
-            start_date =1,
-            end_date = 31
+            start_date = 1,
+            end_date = month_days(end_year, end_month),
+            extend = True
         )
+        set_progressbar_perc(feedback,14,'Set projection and scale')
         cv.generate_proj_scale()
+        set_progressbar_perc(feedback,15,'Filter ee.ImageCollection')
+        iColl_filtered = cv.filter_image_coll(date_range=date_range)
+        set_progressbar_perc(feedback,20,'Calculate Area Weighted Average')
+        awa_dict = cv.get_area_weighted_average(iColl_filtered, 20, 60)
+        set_progressbar_perc(feedback,80,'Save Area Weighted Average as CSV')
+        awa_df = cv.get_awa_df(awa_dict)
+        awa_csv_path = out_csv.replace('.csv','_awa.csv')
+        out_log = {'AWA CSV': awa_csv_path}
+        cv.save_awa_df(awa_df, awa_csv_path)
+        set_progressbar_perc(feedback,85,'Calculate Std.Dev, Mean and CV')
+        std_df = cv.calc_std_dev(awa_df)
+        mean_df = cv.calc_mean(awa_df)
+        joined_df = cv.join_dfs(std_df, mean_df)
+        set_progressbar_perc(feedback, 95,'Save CV as CSV')
+        cv_df = cv.calc_cv(joined_df)
+        cv.save_cv_df(cv_df, out_csv)
+        set_progressbar_perc(feedback,100,'Completed!')
+        out_log[self.OUTPUT] = out_csv
+        return out_log
 
     def name(self):
         return 'coeff_var'
