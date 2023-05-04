@@ -68,7 +68,7 @@ class AboutPlugin(QDialog):
             df = pd.read_csv(
                 r'https://raw.githubusercontent.com/balakumaran247/geocogs/main/version.csv')
             uversion = float(df['version'][0])
-        except TimeoutError:
+        except Exception:
             return "Failed to Check"
         if uversion > self.cversion:
             return "new version available"
