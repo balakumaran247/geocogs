@@ -29,7 +29,6 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
                 'ETa(SSEBop)',
                 'soil moisture',
                 'groundwater',
-                'co-efficient of variation(rain)',
                 'NDVI',
                 'ET(IITB)']
     

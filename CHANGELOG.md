@@ -1,4 +1,11 @@
 # Changelog
+## v0.8
+### Feature
+- added Coefficient of Variation processing tool
+- updated About with logo and Check update button
+- removed Coeff of Var Rain from BoundaryStatistics
+### Fix
+- Temporal stats calculation of IITB ET
 ## v0.7
 ### Feature
 - added IITB ET product in boundary statistics

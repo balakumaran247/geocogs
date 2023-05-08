@@ -53,14 +53,27 @@ class GeoCogsPlugin:
     def lulcstats_run(self):
         processing.execAlgorithmDialog("geocogs:lulc_stats")
 
+    def coeffvar_init(self):
+        self.coeffvar_action = QAction(QIcon(self.icon),"Coeff of Variation", self.iface.mainWindow())
+        self.coeffvar_action.triggered.connect(self.coeffvar_run)
+        self.iface.addPluginToMenu(u"&GeoCogs", self.coeffvar_action)
+    
+    def coeffvar_unload(self):
+        self.iface.removePluginMenu("&GeoCogs", self.coeffvar_action)
+    
+    def coeffvar_run(self):
+        processing.execAlgorithmDialog("geocogs:coeff_var")
+
     def initGui(self):
         self.processing_provider_init()
         self.about_init()
         self.boundarystats_init()
         self.lulcstats_init()
+        self.coeffvar_init()
 
     def unload(self):
         self.processing_provider_unload()
         self.about_unload()
         self.boundarystats_unload()
         self.lulcstats_unload()
+        self.coeffvar_unload()
