@@ -105,7 +105,7 @@ class BoundaryWiseStats:
             timestamp = None
             for ix, ele in enumerate(dr):
                 start, end, coeff = ele
-                coeff = coeff if self.tempReducer in {'total'} else 1
+                coeff = coeff if self.temporal_stat in {'total'} else 1
                 mimages = self.iColl_filtered.filter(ee.Filter.date(start, end)).select(0)
                 if ix == 1:
                     timestamp = ee.Image(mimages.first()).get('system:time_start')
