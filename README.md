@@ -1,5 +1,5 @@
 # geocogs
-<img src="icon.png" alt="GeoCogs" width="100" height="100" style="display:block; margin:auto">
+<p align="center"><img src="icon.png" alt="GeoCogs" width="100" height="100"></p>
 
 GeoCogs is an automatic data acquisition and statistics QGIS processing plugin developed in python and Google Earth Engine for processing the Remote Sensing data.
 
