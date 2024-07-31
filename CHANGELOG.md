@@ -1,6 +1,8 @@
 # Changelog
 ## v0.9
 ### Fix
+- GEE assets
+- Removed IITB ET, GW datasets from boundarystatistics
 - Temporal stats calculation of IITB ET
 ## v0.8
 ### Feature
