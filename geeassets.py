@@ -2,16 +2,16 @@ import ee
 ee.Initialize()
 
 image_col = {
-    'Precipitation' : ee.ImageCollection("users/jaltol/IMD/rain"),
-    'Min Temp' : ee.ImageCollection("users/jaltol/IMD/minTemp"),
-    'Max Temp' : ee.ImageCollection("users/jaltol/IMD/maxTemp"),
-    'ETa(SSEBop)' : ee.ImageCollection("users/jaltol/ET_new/etSSEBop"),
+    'Precipitation' : ee.ImageCollection("users/jaltolwelllabs/IMD/rain"),
+    'Min Temp' : ee.ImageCollection("users/jaltolwelllabs/IMD/minTemp"),
+    'Max Temp' : ee.ImageCollection("users/jaltolwelllabs/IMD/maxTemp"),
+    'ETa(SSEBop)' : ee.ImageCollection("users/jaltolwelllabs/ET/etSSEBop"),
     'soil moisture' : ee.ImageCollection("NASA_USDA/HSL/SMAP10KM_soil_moisture"),
-    'groundwater' : ee.ImageCollection("users/jaltol/GW/IndiaWRIS"),
+    'groundwater' : ee.ImageCollection("users/jaltolwelllabs/GW/IndiaWRIS_IN"),
     'dynamicworld': ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1"),
     'co-efficient of variation(rain)': ee.ImageCollection("users/jaltol/realwater/cvRainfall"),
     'S2': ee.ImageCollection("COPERNICUS/S2"),
-    'ET(IITB)': ee.ImageCollection('users/jaltol/ET_new/IITB'),
+    'ET(IITB)': ee.ImageCollection('users/jaltolwelllabs/ET/IITB'),
 }
 
 feature_col = {

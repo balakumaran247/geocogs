@@ -28,9 +28,10 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
                 'Max Temp',
                 'ETa(SSEBop)',
                 'soil moisture',
-                'groundwater',
+                # 'groundwater',
                 'NDVI',
-                'ET(IITB)']
+                # 'ET(IITB)'
+                ]
     
     def initAlgorithm(self, config=None):
         # input of Polygon Layer
