@@ -1,4 +1,4 @@
-from .geocogs import GeoCogsPlugin
+from .src.geocogs import GeoCogsPlugin
 
 def classFactory(iface):
     return GeoCogsPlugin(iface)

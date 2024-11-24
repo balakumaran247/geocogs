@@ -1,9 +1,11 @@
+import inspect
+import os
+
 from qgis.core import QgsProcessingProvider
 from qgis.PyQt.QtGui import QIcon
-import os, inspect
-from .boundarystatistics.boundarystatistics import BoundaryStatsAlgorithm
-from .dwlulcstatistics.dwlulcstatistics import LulcStatsAlgorithm
-from .coeffofvariation.coeffofvariation import CoeffVariationAlgorithm
+
+from .boundarystatistics import BoundaryStatsAlgorithm
+# from .dwlulcstatistics import LulcStatsAlgorithm
 
 
 class ToolProvider(QgsProcessingProvider):
@@ -16,8 +18,7 @@ class ToolProvider(QgsProcessingProvider):
 
     def loadAlgorithms(self):
         self.addAlgorithm(BoundaryStatsAlgorithm())
-        self.addAlgorithm(LulcStatsAlgorithm())
-        self.addAlgorithm(CoeffVariationAlgorithm())
+        # self.addAlgorithm(LulcStatsAlgorithm())
         # add additional algorithms here
         # self.addAlgorithm(MyOtherAlgorithm())
 
