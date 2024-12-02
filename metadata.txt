@@ -1,6 +1,6 @@
 [general]
 name=GeoCogs
-description=This plugin is a collection of geoprocessing tools for automation
+description=This plugin is a collection of geoprocessing tools for data and statistics
 version=0.8
 qgisMinimumVersion=3.0
 author=Balakumaran Ramachandran
