@@ -17,12 +17,11 @@ def read_json() -> Dict:
     Raises:
         FileNotFoundError: If the JSON file does not exist.
     """
-    if os.path.exists(imagecollections_json):
-        with open(imagecollections_json) as f:
-            data = json.load(f)
-        return data
-    else:
+    if not os.path.exists(imagecollections_json):
         raise FileNotFoundError(f'{imagecollections_json} not found')
+    with open(imagecollections_json) as f:
+        data = json.load(f)
+    return data
 
 
 def write_json(data: Dict) -> None:
