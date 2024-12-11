@@ -10,7 +10,7 @@
         "calendar_start": 2000,
         "hydrological_start": 2000,
         "calendar_end": 2020,
-        "hydrological_end": 2020
+        "hydrological_end": 2019
     },
     "ETa SSEBop": {
         "id": "users/jaltolwelllabs/ET/etSSEBop",
@@ -23,20 +23,7 @@
         "calendar_start": 2004,
         "hydrological_start": 2004,
         "calendar_end": 2020,
-        "hydrological_end": 2020
-    },
-    "Dynamic World V1": {
-        "id": "GOOGLE/DYNAMICWORLD/V1",
-        "start_year": 2015,
-        "start_month": 6,
-        "start_day": 27,
-        "end_year": 2024,
-        "end_month": 12,
-        "end_day": 10,
-        "calendar_start": 2016,
-        "hydrological_start": 2016,
-        "calendar_end": 2024,
-        "hydrological_end": 2024
+        "hydrological_end": 2019
     },
     "IMD Rainfall": {
         "id": "users/jaltolwelllabs/IMD/rain",
@@ -49,7 +36,7 @@
         "calendar_start": 2000,
         "hydrological_start": 2000,
         "calendar_end": 2023,
-        "hydrological_end": 2023
+        "hydrological_end": 2022
     },
     "IMD Min Temperature": {
         "id": "users/jaltolwelllabs/IMD/minTemp",
@@ -62,7 +49,20 @@
         "calendar_start": 2000,
         "hydrological_start": 2000,
         "calendar_end": 2020,
-        "hydrological_end": 2020
+        "hydrological_end": 2019
     },
-    "last_update": "2024-12-10"
+    "Dynamic World V1": {
+        "id": "GOOGLE/DYNAMICWORLD/V1",
+        "start_year": 2015,
+        "start_month": 6,
+        "start_day": 27,
+        "end_year": 2024,
+        "end_month": 12,
+        "end_day": 10,
+        "calendar_start": 2016,
+        "hydrological_start": 2016,
+        "calendar_end": 2024,
+        "hydrological_end": 2023
+    },
+    "last_update": "2024-12-11"
 }
