@@ -2,7 +2,9 @@ from PyQt5.QtCore import QCoreApplication
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (QWidget, QListWidget, QListWidgetItem,
                                 QLabel, QLineEdit, QGridLayout, QMenu,
-                                QAction, QCheckBox)
+                                QAction, QCheckBox, QComboBox, QSpinBox,
+                                QFileDialog, QPushButton, QRadioButton,
+                                QButtonGroup)
 import os, inspect
 from processing.gui.wrappers import WidgetWrapper
 from qgis.core import (QgsProcessing,
@@ -14,9 +16,11 @@ from qgis.core import (QgsProcessing,
                         QgsProcessingParameterString,
                         QgsProcessingException,
                         QgsProcessingParameterVectorLayer,
+                        QgsProcessingOutputFile,
                         QgsProcessingParameterMatrix,
                         QgsMapLayerProxyModel)
-from qgis.gui import (QgsMapLayerComboBox, QgsFieldComboBox)
+from qgis.gui import (QgsMapLayerComboBox, QgsFieldComboBox, QgsExternalStorageFileWidget)
+from datetime import datetime
 
 # https://gis.stackexchange.com/questions/465952/how-to-chose-a-vector-layer-chose-a-field-then-chose-values-using-parameterase
 
@@ -45,13 +49,16 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
     #             ]
     
     def initAlgorithm(self, config=None):
-        param = QgsProcessingParameterMatrix(self.INPUT_PARAMS, self.INPUT_PARAMS.title())
+        param = QgsProcessingParameterMatrix(self.INPUT_PARAMS, 'Boundary Statistics')
         param.setMetadata({'widget_wrapper': {'class': BoundaryStatsWidget}})
         self.addParameter(param)
         
     def processAlgorithm(self, parameters, context, feedback):
         user_options = self.parameterAsMatrix(parameters, self.INPUT_PARAMS, context)
         input_vector_layer, selected_features, unique_field = user_options
+
+        from ..core.gee import ImageCollections
+        ImageCollections.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
         
         return {'INPUT_LAYER': input_vector_layer,
                 'SELECTED_FEATURES': selected_features,
@@ -242,6 +249,16 @@ class BoundaryStatsWidget(WidgetWrapper):
         return params
     
 class customParametersWidget(QWidget):
+    PARAMETERS = [
+        'IMD Rainfall',
+        'IMD Max Temperature',
+        'IMD Min Temperature',
+        'ETa SSEBop'
+    ]
+    SPANOPTIONS = ['Calendar Year','Hydrological Year']
+    STEPOPTIONS = ['Monthly','Yearly']
+    REDUCERS = ['Mean', 'Median', 'Max', 'Min', 'Mode', 'Total']
+    TILESCALE = ["1", "2", "4"]
     def __init__(self):
         super(customParametersWidget, self).__init__()
         
@@ -249,20 +266,120 @@ class customParametersWidget(QWidget):
         self.lyr_cb = QgsMapLayerComboBox(self)
         self.lyr_cb.setFilters(QgsMapLayerProxyModel.VectorLayer)
         self.lyr_cb.layerChanged.connect(self.layer_changed)
+
         self.onlyselected_cb = QCheckBox('Only Selected Features', self)
+        
+        self.parm_lbl = QLabel('Select Parameter:')
+        self.parm_cb = QComboBox(self)
+        self.parm_cb.addItems(self.PARAMETERS)
+        
+        self.span_lb1 = QLabel('Select Span:')
+        self.span_cb = QComboBox(self)
+        self.span_cb.addItems(self.SPANOPTIONS)
+        
+        self.step_lb1 = QLabel('Select Step:')
+        self.step_cb = QComboBox(self)
+        self.step_cb.addItems(self.STEPOPTIONS)
+        
         self.fld_lbl = QLabel('Select Unique Field:')
         self.fld_cb = QgsFieldComboBox(self)
         self.fld_cb.setLayer(self.lyr_cb.currentLayer())
         # self.fld_cb.fieldChanged.connect(self.populate_list_widget)
         
+        self.start_year_lb1 = QLabel('Start Year:')
+        self.start_year_int = QSpinBox(self)
+        self.start_year_int.setMinimum(1994)
+        self.start_year_int.setMaximum(2021)
+        self.start_year_int.setValue(2020)
+        self.start_year_int.setSingleStep(1)
+        self.start_year_int.setWrapping(True)
+        
+        self.end_year_lb1 = QLabel('End Year:')
+        self.end_year_int = QSpinBox(self)
+        self.end_year_int.setMinimum(1994)
+        self.end_year_int.setMaximum(2021)
+        self.end_year_int.setValue(2020)
+        self.end_year_int.setSingleStep(1)
+        self.end_year_int.setWrapping(True)
+        
+        self.spatial_lb1 = QLabel('Spatial Reducer:')
+        self.spatial_cb = QComboBox(self)
+        self.spatial_cb.addItems(self.REDUCERS)
+        
+        self.temporal_lb1 = QLabel('Temporal Reducer:')
+        self.temporal_cb = QComboBox(self)
+        self.temporal_cb.addItems(self.REDUCERS)
+        
+        self.scale_lb1 = QLabel('Scale (optional):')
+        self.scale_int = QSpinBox(self)
+        self.scale_int.setMinimum(10)
+        self.scale_int.setMaximum(1000)
+        self.scale_int.setValue(100)
+        self.scale_int.setSingleStep(10)
+        self.scale_int.setWrapping(True)
+        
+        self.tilescale_lb1 = QLabel('tileScale (optional):')
+        self.tilescale_cb = QComboBox(self)
+        self.tilescale_cb.addItems(self.TILESCALE)
+        
+        self.export_lb1 = QLabel('Export to:')
+        self.rbgroup = QButtonGroup()
+        self.export_rb1 = QRadioButton("Local (Light Computation)")
+        self.export_rb2 = QRadioButton("Google Drive (Heavy Computation)")
+        self.export_rb1.setChecked(True)
+        self.export_rb1.toggled.connect(self.export_type)
+        self.export_option = 'local'
+
+        self.export_btn = QPushButton('Browse')
+        self.export_btn.clicked.connect(self.browse)
+        self.export_ln = QLineEdit('Path to export CSV file', self)
+        
         self.layout = QGridLayout()
         self.layout.addWidget(self.lyr_lbl, 0, 0, 1, 1)
-        self.layout.addWidget(self.lyr_cb, 0, 1, 1, 3)
-        self.layout.addWidget(self.onlyselected_cb, 1, 1, 1, 3)
-        self.layout.addWidget(self.fld_lbl, 2, 0, 1, 1)
-        self.layout.addWidget(self.fld_cb, 2, 1, 1, 3)
+        self.layout.addWidget(self.lyr_cb, 0, 1, 1, 2)
+        self.layout.addWidget(self.onlyselected_cb, 0, 3, 1, 1)
+        self.layout.addWidget(self.fld_lbl, 1, 0, 1, 1)
+        self.layout.addWidget(self.fld_cb, 1, 1, 1, 1)
+        self.layout.addWidget(self.parm_lbl, 1, 2, 1, 1)
+        self.layout.addWidget(self.parm_cb, 1, 3, 1, 1)
+        self.layout.addWidget(self.span_lb1, 2, 0, 1, 1)
+        self.layout.addWidget(self.span_cb, 2, 1, 1, 1)
+        self.layout.addWidget(self.step_lb1, 2, 2, 1, 1)
+        self.layout.addWidget(self.step_cb, 2, 3, 1, 1)
+        self.layout.addWidget(self.start_year_lb1, 3, 0, 1, 1)
+        self.layout.addWidget(self.start_year_int, 3, 1, 1, 1)
+        self.layout.addWidget(self.end_year_lb1, 3, 2, 1, 1)
+        self.layout.addWidget(self.end_year_int, 3, 3, 1, 1)
+        self.layout.addWidget(self.spatial_lb1, 4, 0, 1, 1)
+        self.layout.addWidget(self.spatial_cb, 4, 1, 1, 1)
+        self.layout.addWidget(self.temporal_lb1, 4, 2, 1, 1)
+        self.layout.addWidget(self.temporal_cb, 4, 3, 1, 1)
+        self.layout.addWidget(self.scale_lb1, 5, 0, 1, 1)
+        self.layout.addWidget(self.scale_int, 5, 1, 1, 1)
+        self.layout.addWidget(self.tilescale_lb1, 5, 2, 1, 1)
+        self.layout.addWidget(self.tilescale_cb, 5, 3, 1, 1)
+        self.layout.addWidget(self.export_lb1, 6, 0, 1, 1)
+        self.layout.addWidget(self.export_rb1, 6, 1, 1, 1)
+        self.layout.addWidget(self.export_rb2, 6, 2, 1, 1)
+        self.layout.addWidget(self.export_ln, 7, 0, 1, 3)
+        self.layout.addWidget(self.export_btn, 7, 3, 1, 1)
         
         self.setLayout(self.layout)
+    
+    def export_type(self):
+        if self.export_rb1.isChecked():
+            self._export_type_behaviour('local', True)
+        else:
+            self._export_type_behaviour('drive', False)
+
+    def _export_type_behaviour(self, arg0, arg1):
+        self.export_option = arg0
+        self.export_ln.setVisible(arg1)
+        self.export_btn.setVisible(arg1)
+    
+    def browse(self):
+        self.export_path = QFileDialog.getSaveFileName(None, self.tr("Save As"),None,self.tr("CSV files (*.csv)"))
+        self.export_ln.setText(self.export_path[0])
     
     def layer_changed(self, lyr):
         self.fld_cb.setLayer(lyr)
