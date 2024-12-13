@@ -1,11 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from time import perf_counter
+from typing import Any, Optional
 
 import ee
+from qgis.core import QgsProcessingFeedback
 
-from .helper import read_json, write_json
+from .helper import Assistant
 
 ee.Initialize()
 
@@ -25,6 +27,12 @@ class ImageCollections:
             parameter (str): The parameter for the image collection.
         """
         self.parameter = parameter
+
+    def __call__(self) -> ee.ImageCollection:
+        """
+        Returns the Earth Engine ImageCollection object.
+        """
+        return ee.ImageCollection(self.parameter)
 
     @staticmethod
     def _get_date(asset: Any, start_date: ee.Date, advance_count: int) -> datetime:
@@ -46,11 +54,12 @@ class ImageCollections:
             start_date, end_date) if advance_count > 0 else asset.filterDate(end_date, start_date)
         if adv_filtered.size().getInfo():
             return ImageCollections._get_date(asset, end_date, advance_count)
-        if not filtered.size().getInfo():
-            raise ValueError(f'get_date method failed on {asset.get(
-                'system:id').getInfo()} for {start_date.format().getInfo()}')
-        date = filtered.aggregate_max(ImageCollections.TIMESTAMP_LABEL).getInfo(
-        ) if advance_count > 0 else filtered.aggregate_min(ImageCollections.TIMESTAMP_LABEL).getInfo()
+        try:
+            date = filtered.aggregate_max(ImageCollections.TIMESTAMP_LABEL).getInfo(
+            ) if advance_count > 0 else filtered.aggregate_min(ImageCollections.TIMESTAMP_LABEL).getInfo()
+        except Exception as e:
+            raise ValueError(
+                f'Failed to get date for {asset.get("system:id").getInfo()}') from e
         return datetime.fromtimestamp(date/1000.0)
 
     @staticmethod
@@ -120,7 +129,7 @@ class ImageCollections:
         return data
 
     @staticmethod
-    def update_metadata(date: str) -> None:
+    def update_metadata(date: str, feedback: Optional[QgsProcessingFeedback] = None) -> None:
         """
         Updates the metadata by fetching properties for each item in the image collections JSON.
 
@@ -134,8 +143,9 @@ class ImageCollections:
         Raises:
             KeyError: If the 'last_update' key is not found in the image collections JSON.
         """
-        data = read_json()
+        data = Assistant.read_json()
         if last_update := data.get('last_update') != date:
+            start_time = perf_counter()
             if not last_update:
                 raise KeyError(
                     'last_update key not found in the imagecollections JSON')
@@ -146,10 +156,23 @@ class ImageCollections:
                            for k, v in data.items()]
             for future in as_completed(futures):
                 out = future.result()
+                Assistant.logger(
+                    feedback,
+                    f'Updated metadata for {list(out.keys())[0]}',
+                    True
+                )
                 out_dict |= out
             out_dict = ImageCollections._compute_year_step(out_dict)
             out_dict['last_update'] = date
-            write_json(out_dict)
+            Assistant.write_json(out_dict)
+            end_time = perf_counter()
+            Assistant.logger(
+                feedback,
+                f"metadata updated in {end_time - start_time:.2f} seconds",
+                True
+            )
+        else:
+            Assistant.logger(feedback, 'Metadata is up to date', True)
 
 
 @dataclass
