@@ -28,11 +28,18 @@ class ImageCollections:
         """
         self.parameter = parameter
 
+    @property
+    def ee_object(self) -> ee.ImageCollection:
+        """
+        Returns the Earth Engine ImageCollection object.
+        """
+        return ee.ImageCollection(Assistant.read_json().get(self.parameter).get('id'))
+
     def __call__(self) -> ee.ImageCollection:
         """
         Returns the Earth Engine ImageCollection object.
         """
-        return ee.ImageCollection(self.parameter)
+        return self.ee_object
 
     @staticmethod
     def _get_date(asset: Any, start_date: ee.Date, advance_count: int) -> datetime:
