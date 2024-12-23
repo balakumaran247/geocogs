@@ -41,10 +41,31 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
                 'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
         kwargs = dict(zip(keys, user_options))
 
-        from ..core.gee import ImageCollections
-        ImageCollections.update_metadata(
-            f'{datetime.now():%Y-%m-%d}', feedback)
+        from ..core.gee import ImageCollections, Reducers
+        from ..core.helper import Assistant
+        from ..core.process import GeoCogs
+        
+        ic = ImageCollections(kwargs['PARAMETER'])
+        params = {
+            'band': ic.band,
+            'temp_reducer': Reducers(kwargs['TEMPORALSTAT'])(),
+            'spat_reducer': Reducers(kwargs['SPATIALSTAT'])(), 
+            'scale': kwargs['SCALE'],
+            'tileScale': kwargs['TILESCALE'],
+            'crs': None,
+            'bands': None,
+            'bandsRename': None,
+            'imgProps': None,
+            'imgPropsRename': None,
+            'datetimeName': 'date',
+            'datetimeFormat': 'YYYY-MM-dd'
+        }
 
+        ic.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
+
+        core = GeoCogs(params)
+        fc = core.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
+        ic_reduced = core.reduce2imagecollection(ic.ee_object, fc, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
         return kwargs
 
     # def set_feedback(self, feedback, perc):
@@ -140,7 +161,7 @@ class BoundaryStatsWidget(WidgetWrapper):
         spatial_reducer = self.custom_widget.spatial_cb.currentText()
         temporal_reducer = self.custom_widget.temporal_cb.currentText()
         scale = self.custom_widget.scale_int.value()
-        tilescale = self.custom_widget.tilescale_cb.currentText()
+        tilescale = int(self.custom_widget.tilescale_cb.currentText())
         export_to = self.custom_widget.export_option
         export_path = self.custom_widget.export_ln.text()
         return [
@@ -159,7 +180,7 @@ class customParametersWidget(QWidget):
     ]
     SPANOPTIONS = ['Calendar Year', 'Hydrological Year']
     STEPOPTIONS = ['Monthly', 'Yearly']
-    REDUCERS = ['Mean', 'Median', 'Max', 'Min', 'Mode', 'Total']
+    REDUCERS = ['Mean', 'Median', 'Max', 'Min', 'Mode', 'Sum']
     TILESCALE = ["1", "2", "4"]
 
     def __init__(self):
