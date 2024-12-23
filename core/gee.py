@@ -16,8 +16,8 @@ class ImageCollections:
     TIMESTAMP_LABEL = 'system:time_start'
     CALENDAR_START_MONTH = 1
     CALENDAR_END_MONTH = 12
-    HYDROLOGICAL_START_MONTH = 6
-    HYDROLOGICAL_END_MONTH = 5
+    HYDROLOGICAL_START_MONTH = Assistant.read_preferences()['dateTime']['hydrologicalYearStartMonth']
+    HYDROLOGICAL_END_MONTH = HYDROLOGICAL_START_MONTH - 1
 
     def __init__(self, parameter: str) -> None:
         """
@@ -27,6 +27,19 @@ class ImageCollections:
             parameter (str): The parameter for the image collection.
         """
         self.parameter = parameter
+
+    @property
+    def band(self) -> str:
+        """
+        Returns the band name for the image collection.
+        """
+        return {
+            'IMD Rainfall': 'b1',
+            'IMD Max Temperature': 'b1',
+            'IMD Min Temperature': 'b1',
+            'ETa SSEBop': 'b1',
+            'Dynamic World V1': 'label'
+        }[self.parameter]
 
     @property
     def ee_object(self) -> ee.ImageCollection:
@@ -163,23 +176,22 @@ class ImageCollections:
                            for k, v in data.items()]
             for future in as_completed(futures):
                 out = future.result()
-                Assistant.logger(
-                    feedback,
-                    f'Updated metadata for {list(out.keys())[0]}',
-                    True
-                )
+                # if feedback: Assistant.logger(
+                #     feedback,
+                #     f'Updated metadata for {list(out.keys())[0]}',
+                #     True
+                # )
                 out_dict |= out
             out_dict = ImageCollections._compute_year_step(out_dict)
             out_dict['last_update'] = date
             Assistant.write_json(out_dict)
             end_time = perf_counter()
-            Assistant.logger(
+            if feedback: Assistant.logger(
                 feedback,
                 f"metadata updated in {end_time - start_time:.2f} seconds",
                 True
             )
-        else:
-            Assistant.logger(feedback, 'Metadata is up to date', True)
+        if feedback: Assistant.logger(feedback, 'Metadata is up to date', True)
 
 
 @dataclass
@@ -188,20 +200,27 @@ class Reducers:
     A class to manage and retrieve Google Earth Engine (GEE) reducers.
     Attributes:
         reducer (str): The name of the reducer to retrieve.
-        _reducers (dict[str, ee.Reducer]): A dictionary mapping reducer names to their corresponding GEE Reducer objects.
     Methods:
+        ee_object() -> ee.Reducer:
+            Returns the GEE Reducer object corresponding to the specified reducer name.
         __call__() -> ee.Reducer:
             Returns the GEE Reducer object corresponding to the specified reducer name.
     """
     reducer: str
-    _reducers: dict[str, ee.Reducer] = field(default_factory=lambda: {
-        'total': ee.Reducer.sum(),
-        'mean': ee.Reducer.mean(),
-        'median': ee.Reducer.median(),
-        'max': ee.Reducer.max(),
-        'min': ee.Reducer.min(),
-        'mode': ee.Reducer.mode()
-    }, init=False, repr=False, hash=True, compare=False)
 
+    @property
+    def ee_object(self) -> ee.Reducer:
+        """
+        Returns the Earth Engine Reducer object.
+        """
+        return {
+            'sum': ee.Reducer.sum(),
+            'mean': ee.Reducer.mean(),
+            'median': ee.Reducer.median(),
+            'max': ee.Reducer.max(),
+            'min': ee.Reducer.min(),
+            'mode': ee.Reducer.mode()
+        }[self.reducer.lower()]
+    
     def __call__(self) -> ee.Reducer:
-        return self._reducers.get(self.reducer.lower())
+        return self.ee_object
