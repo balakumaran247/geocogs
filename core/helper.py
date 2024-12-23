@@ -3,12 +3,28 @@ import json
 import os
 from typing import Dict, Optional
 
+import yaml
 from qgis.core import QgsProcessingException, QgsProcessingFeedback
 
 
 class Assistant:
     CMD_FOLDER = os.path.split(inspect.getfile(inspect.currentframe()))[0]
     IMAGECOLLECTIONS_JSON = os.path.join(CMD_FOLDER, 'imagecollections.json')
+    PREFERENCES_YAML = os.path.join(
+        CMD_FOLDER.replace(r'\core', ''), 'preferences.yaml')
+
+    @staticmethod
+    def read_preferences() -> Dict:
+        """
+        Reads the preferences from a YAML file specified by the PREFERENCES_YAML
+        attribute of the Assistant class.
+
+        Returns:
+            Dict: A dictionary containing the preferences loaded from the YAML file.
+        """
+        with open(Assistant.PREFERENCES_YAML, 'r') as file:
+            preferences = yaml.safe_load(file)
+        return preferences
 
     @staticmethod
     def read_json() -> Dict:
