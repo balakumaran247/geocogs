@@ -1,0 +1,8 @@
+---
+# Caution while modifying this file
+# Could break GeoCogs
+dateTime:
+  hydrologicalYearStartMonth: 6
+defaults:
+  defaultScale: 100
+  defaultYear: 2019
