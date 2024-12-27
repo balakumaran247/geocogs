@@ -45,6 +45,7 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
                 'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
         kwargs = dict(zip(keys, user_options))
 
+        Assistant.set_progressbar_perc(feedback, 10, 'Initializing Earth Engine...')
         ee.Initialize()
         
         self.set_parameter(kwargs['PARAMETER'])
@@ -63,17 +64,29 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             'datetimeFormat': 'YYYY-MM'
         }
 
+        Assistant.set_progressbar_perc(feedback, 20, 'Updating Metadata... (takes time)')
         self.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
 
         self.set_params(params)
+        Assistant.set_progressbar_perc(feedback, 50, 'Converting Layer to EE FeatureCollection...')
         self.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
+        Assistant.set_progressbar_perc(feedback, 60, 'Temporally Reducing ImageCollection...')
         ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
+        Assistant.set_progressbar_perc(feedback, 70, 'Checking reduced ImageCollection...')
+        self.check_imagecollection(ic_reduced)
         get_stats = self.zonal_stats(ic_reduced, self.ee_featurecollection)
+        Assistant.set_progressbar_perc(feedback, 80, 'Calculation & Exporting Data...')
         if kwargs['EXPORT_TO'] == 'local':
-            stats = get_stats.getInfo()
+            try:
+                stats = get_stats.getInfo()
+            except Exception as e:
+                raise ChildProcessError(Assistant.DISCLAIMER) from e
+            Assistant._check_directory(kwargs['EXPORT_PATH'])
             Assistant.export2csv(stats, kwargs['EXPORT_PATH'], kwargs['SPATIALSTAT'], kwargs['INPUT_FIELD'], params['datetimeName'])
-            summary = {'Output': kwargs['EXPORT_PATH']}
-        return summary
+            return {'Output': kwargs['EXPORT_PATH']}
+        else:
+            self.export2drive(get_stats, f'GeoCogs_{self.layer_name}')
+            return Assistant.DRIVE_MSG
 
 
     def name(self):
@@ -138,6 +151,7 @@ class customParametersWidget(QWidget):
     STEPOPTIONS = ['Monthly', 'Yearly']
     REDUCERS = ['Mean', 'Median', 'Max', 'Min', 'Mode', 'Sum']
     TILESCALE = ["1", "2", "4"]
+    DEFAULT_PATH = Assistant.default_path()
 
     def __init__(self):
         super(customParametersWidget, self).__init__()
@@ -211,7 +225,7 @@ class customParametersWidget(QWidget):
 
         self.export_btn = QPushButton('Browse')
         self.export_btn.clicked.connect(self.browse)
-        self.export_ln = QLineEdit(os.path.join(os.path.expanduser("~"), 'Desktop', 'GeoCogs_Output.csv'), self)
+        self.export_ln = QLineEdit(self.DEFAULT_PATH, self)
 
         self.layout = QGridLayout()
         self.layout.addWidget(self.lyr_lbl, 0, 0, 1, 1)

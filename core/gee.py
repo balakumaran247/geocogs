@@ -39,6 +39,17 @@ class ImageCollections:
         """
         return ee.ImageCollection(Assistant.read_json().get(self.parameter).get('id'))
 
+    def check_imagecollection(self, imagecollection: ee.ImageCollection) -> None:
+        """
+        Checks the image collection for the given image collection and feedback.
+
+        Args:
+            imagecollection (ee.ImageCollection): The Earth Engine ImageCollection.
+            feedback (QgsProcessingFeedback): The feedback object.
+        """
+        if not imagecollection.size().getInfo():
+            raise ValueError(f'No images found in reduced {self.parameter} collection')
+
     @staticmethod
     def _get_date(asset: Any, start_date: ee.Date, advance_count: int) -> datetime:
         """

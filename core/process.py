@@ -37,6 +37,7 @@ class GeoCogs:
                 feature["id"] = f'{feature["id"]:04d}'
             return ee.FeatureCollection(gj)
         selected_count = active_lyr.selectedFeatureCount()
+        self.layer_name = active_lyr.name()
         if selected:
             if feedback: Assistant.logger(feedback, f'selected features: {selected_count}')
             self.ee_featurecollection = convert2ee(active_lyr, active_lyr.selectedFeatures())
@@ -97,6 +98,15 @@ class GeoCogs:
         results = ic.map(_get_stats).flatten()#.filter(ee.Filter.notNull(self._params['bandsRename']))
 
         return results
+
+    def export2drive(self, data: ee.FeatureCollection, filename: str) -> None:
+        task = ee.batch.Export.table.toDrive(
+            collection=data,
+            description=filename,
+            fileFormat='CSV',
+            fileNamePrefix=filename
+        )
+        task.start()
 
     def _composite(self, date: str, ic: ee.ImageCollection, fc: ee.FeatureCollection, unit: str) -> ee.Image:
         start_date = ee.Date(date)
