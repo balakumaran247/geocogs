@@ -9,31 +9,22 @@ from qgis.core import QgsProcessingFeedback
 
 from .helper import Assistant
 
-ee.Initialize()
-
-
 class ImageCollections:
     TIMESTAMP_LABEL = 'system:time_start'
     CALENDAR_START_MONTH = 1
     CALENDAR_END_MONTH = 12
     HYDROLOGICAL_START_MONTH = Assistant.read_preferences()['dateTime']['hydrologicalYearStartMonth']
     HYDROLOGICAL_END_MONTH = HYDROLOGICAL_START_MONTH - 1
-
-    def __init__(self, parameter: str) -> None:
+    
+    def set_parameter(self, parameter: str) -> None:
         """
-        Initializes the ImageCollections class with a parameter.
+        Sets the parameter for the ImageCollection class.
 
         Args:
             parameter (str): The parameter for the image collection.
         """
         self.parameter = parameter
-
-    @property
-    def band(self) -> str:
-        """
-        Returns the band name for the image collection.
-        """
-        return {
+        self.band = {
             'IMD Rainfall': 'b1',
             'IMD Max Temperature': 'b1',
             'IMD Min Temperature': 'b1',
@@ -42,17 +33,11 @@ class ImageCollections:
         }[self.parameter]
 
     @property
-    def ee_object(self) -> ee.ImageCollection:
+    def ee_imagecollection(self) -> ee.ImageCollection:
         """
         Returns the Earth Engine ImageCollection object.
         """
         return ee.ImageCollection(Assistant.read_json().get(self.parameter).get('id'))
-
-    def __call__(self) -> ee.ImageCollection:
-        """
-        Returns the Earth Engine ImageCollection object.
-        """
-        return self.ee_object
 
     @staticmethod
     def _get_date(asset: Any, start_date: ee.Date, advance_count: int) -> datetime:
@@ -176,11 +161,6 @@ class ImageCollections:
                            for k, v in data.items()]
             for future in as_completed(futures):
                 out = future.result()
-                # if feedback: Assistant.logger(
-                #     feedback,
-                #     f'Updated metadata for {list(out.keys())[0]}',
-                #     True
-                # )
                 out_dict |= out
             out_dict = ImageCollections._compute_year_step(out_dict)
             out_dict['last_update'] = date
@@ -196,20 +176,7 @@ class ImageCollections:
 
 @dataclass
 class Reducers:
-    """
-    A class to manage and retrieve Google Earth Engine (GEE) reducers.
-    Attributes:
-        reducer (str): The name of the reducer to retrieve.
-    Methods:
-        ee_object() -> ee.Reducer:
-            Returns the GEE Reducer object corresponding to the specified reducer name.
-        __call__() -> ee.Reducer:
-            Returns the GEE Reducer object corresponding to the specified reducer name.
-    """
-    reducer: str
-
-    @property
-    def ee_object(self) -> ee.Reducer:
+    def ee_reducer(self, reducer: str) -> ee.Reducer:
         """
         Returns the Earth Engine Reducer object.
         """
@@ -220,7 +187,4 @@ class Reducers:
             'max': ee.Reducer.max(),
             'min': ee.Reducer.min(),
             'mode': ee.Reducer.mode()
-        }[self.reducer.lower()]
-    
-    def __call__(self) -> ee.Reducer:
-        return self.ee_object
+        }[reducer.lower()]
