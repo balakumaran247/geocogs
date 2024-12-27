@@ -1,6 +1,6 @@
 import ee
 import json
-from qgis.core import QgsJsonExporter, QgsProcessingFeedback, QgsVectorLayer
+from qgis.core import QgsJsonExporter, QgsProcessingFeedback, QgsVectorLayer, QgsProcessingException
 from typing import Optional
 
 from .helper import Assistant
@@ -16,7 +16,7 @@ class GeoCogs:
             'spat_reducer': ee.Reducer.mean(),
             'scale': self.PREFERENCES['defaults']['defaultScale'],
             'tileScale': 1,
-            'crs': None,
+            'crs': 'EPSG:4326',
             'bands': None,
             'bandsRename': None,
             'imgProps': None,
@@ -38,11 +38,14 @@ class GeoCogs:
             return ee.FeatureCollection(gj)
         selected_count = active_lyr.selectedFeatureCount()
         self.layer_name = active_lyr.name()
-        if selected:
-            if feedback: Assistant.logger(feedback, f'selected features: {selected_count}')
-            self.ee_featurecollection = convert2ee(active_lyr, active_lyr.selectedFeatures())
-        else:
-            self.ee_featurecollection = convert2ee(active_lyr, active_lyr.getFeatures())
+        try:
+            if selected:
+                if feedback: Assistant.logger(feedback, f'selected features: {selected_count}')
+                self.ee_featurecollection = convert2ee(active_lyr, active_lyr.selectedFeatures())
+            else:
+                self.ee_featurecollection = convert2ee(active_lyr, active_lyr.getFeatures())
+        except Exception as e:
+            raise QgsProcessingException('Error converting layer to ee.FeatureCollection')
     
     def reduce2imagecollection(self, ic: ee.ImageCollection, fc: ee.FeatureCollection, start_year: int, end_year: int, span: str, step: str) -> ee.ImageCollection:
         years_range = range(start_year, end_year+1)
@@ -76,14 +79,6 @@ class GeoCogs:
             self._params['imgPropsRename'] = self._params['imgProps']
 
         def _get_stats(img: ee.Image) -> ee.FeatureCollection:
-            # img = ee.Image(img.select(self._params['bands'], self._params['bandsRename'])) \
-            #     .set(self._params['datetimeName'], img.date().format(self._params['datetimeFormat'])) \
-            #     .set('timestamp', img.get('system:time_start'))
-
-            # props_from = ee.List(self._params['imgProps']).cat(ee.List([self._params['datetimeName'], 'timestamp']))
-            # props_to = ee.List(self._params['imgPropsRename']).cat(ee.List([self._params['datetimeName'], 'timestamp']))
-            # img_props = img.toDictionary(props_from).rename(props_from, props_to)
-
             img = ee.Image(img.set(self._params['datetimeName'], img.date().format(self._params['datetimeFormat'])).set('timestamp', img.get('system:time_start')))
             props = ee.List([self._params['datetimeName'], 'timestamp'])
             img_props = img.toDictionary(props)
@@ -95,7 +90,7 @@ class GeoCogs:
                 tileScale=self._params['tileScale']
             ).map(lambda f: f.set(img_props))
 
-        results = ic.map(_get_stats).flatten()#.filter(ee.Filter.notNull(self._params['bandsRename']))
+        results = ic.map(_get_stats).flatten()
 
         return results
 

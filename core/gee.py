@@ -5,7 +5,7 @@ from time import perf_counter
 from typing import Any, Optional
 
 import ee
-from qgis.core import QgsProcessingFeedback
+from qgis.core import QgsProcessingFeedback, QgsProcessingException
 
 from .helper import Assistant
 
@@ -24,13 +24,7 @@ class ImageCollections:
             parameter (str): The parameter for the image collection.
         """
         self.parameter = parameter
-        self.band = {
-            'IMD Rainfall': 'b1',
-            'IMD Max Temperature': 'b1',
-            'IMD Min Temperature': 'b1',
-            'ETa SSEBop': 'b1',
-            'Dynamic World V1': 'label'
-        }[self.parameter]
+        self.band = Assistant.read_json().get(self.parameter).get('band')
 
     @property
     def ee_imagecollection(self) -> ee.ImageCollection:
@@ -48,7 +42,7 @@ class ImageCollections:
             feedback (QgsProcessingFeedback): The feedback object.
         """
         if not imagecollection.size().getInfo():
-            raise ValueError(f'No images found in reduced {self.parameter} collection')
+            raise QgsProcessingException(f'No images found in reduced {self.parameter} collection')
 
     @staticmethod
     def _get_date(asset: Any, start_date: ee.Date, advance_count: int) -> datetime:
@@ -74,7 +68,7 @@ class ImageCollections:
             date = filtered.aggregate_max(ImageCollections.TIMESTAMP_LABEL).getInfo(
             ) if advance_count > 0 else filtered.aggregate_min(ImageCollections.TIMESTAMP_LABEL).getInfo()
         except Exception as e:
-            raise ValueError(
+            raise QgsProcessingException(
                 f'Failed to get date for {asset.get("system:id").getInfo()}') from e
         return datetime.fromtimestamp(date/1000.0)
 
@@ -163,7 +157,7 @@ class ImageCollections:
         if last_update := data.get('last_update') != date:
             start_time = perf_counter()
             if not last_update:
-                raise KeyError(
+                raise QgsProcessingException(
                     'last_update key not found in the imagecollections JSON')
             data.pop('last_update', None)
             out_dict = {}
@@ -179,7 +173,7 @@ class ImageCollections:
             end_time = perf_counter()
             if feedback: Assistant.logger(
                 feedback,
-                f"metadata updated in {end_time - start_time:.2f} seconds",
+                f"Metadata updated in {end_time - start_time:.2f} seconds",
                 True
             )
         if feedback: Assistant.logger(feedback, 'Metadata is up to date', True)

@@ -2,7 +2,6 @@ import inspect
 import json
 import os
 from typing import Dict, Optional
-import numpy as np
 import pandas as pd
 
 import yaml
@@ -52,7 +51,7 @@ class Assistant:
             FileNotFoundError: If the JSON file does not exist.
         """
         if not os.path.exists(Assistant.IMAGECOLLECTIONS_JSON):
-            raise FileNotFoundError(
+            raise QgsProcessingException(
                 f'{Assistant.IMAGECOLLECTIONS_JSON} not found')
         with open(Assistant.IMAGECOLLECTIONS_JSON) as f:
             data = json.load(f)
@@ -73,7 +72,7 @@ class Assistant:
             with open(Assistant.IMAGECOLLECTIONS_JSON, 'w') as f:
                 json.dump(data, f, indent=4)
         else:
-            raise FileNotFoundError(
+            raise QgsProcessingException(
                 f'{Assistant.IMAGECOLLECTIONS_JSON} not found')
 
     @staticmethod
@@ -129,7 +128,7 @@ class Assistant:
                 or unique_key not in props
                 or reducer_key not in props
             ):
-                raise KeyError(
+                raise QgsProcessingException(
                     f'{date_key}, {unique_key}, or {reducer_key} not found in stats properties')
             date = props[date_key]
             name = props[unique_key]
@@ -152,4 +151,4 @@ class Assistant:
     @staticmethod
     def _check_directory(path: str) -> None:
         dir_name = os.path.dirname(path)
-        if not os.path.exists(dir_name): raise NotADirectoryError(f'{dir_name} not found')
+        if not os.path.exists(dir_name): raise QgsProcessingException(f'{dir_name} not found')

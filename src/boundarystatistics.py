@@ -70,9 +70,8 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
         self.set_params(params)
         Assistant.set_progressbar_perc(feedback, 50, 'Converting Layer to EE FeatureCollection...')
         self.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
-        Assistant.set_progressbar_perc(feedback, 60, 'Temporally Reducing ImageCollection...')
         ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
-        Assistant.set_progressbar_perc(feedback, 70, 'Checking reduced ImageCollection...')
+        Assistant.set_progressbar_perc(feedback, 60, 'Checking ImageCollection...')
         self.check_imagecollection(ic_reduced)
         get_stats = self.zonal_stats(ic_reduced, self.ee_featurecollection)
         Assistant.set_progressbar_perc(feedback, 80, 'Calculation & Exporting Data...')
@@ -80,7 +79,7 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             try:
                 stats = get_stats.getInfo()
             except Exception as e:
-                raise ChildProcessError(Assistant.DISCLAIMER) from e
+                raise QgsProcessingException(Assistant.DISCLAIMER) from e
             Assistant._check_directory(kwargs['EXPORT_PATH'])
             Assistant.export2csv(stats, kwargs['EXPORT_PATH'], kwargs['SPATIALSTAT'], kwargs['INPUT_FIELD'], params['datetimeName'])
             return {'Output': kwargs['EXPORT_PATH']}
@@ -152,6 +151,7 @@ class customParametersWidget(QWidget):
     REDUCERS = ['Mean', 'Median', 'Max', 'Min', 'Mode', 'Sum']
     TILESCALE = ["1", "2", "4"]
     DEFAULT_PATH = Assistant.default_path()
+    IMAGECOLLECTION_JSON = Assistant.read_json()
 
     def __init__(self):
         super(customParametersWidget, self).__init__()
@@ -166,10 +166,12 @@ class customParametersWidget(QWidget):
         self.parm_lbl = QLabel('Select Parameter:')
         self.parm_cb = QComboBox(self)
         self.parm_cb.addItems(self.PARAMETERS)
+        self.parm_cb.currentIndexChanged.connect(self.set_min_max_dates)
 
         self.span_lb1 = QLabel('Select Span:')
         self.span_cb = QComboBox(self)
         self.span_cb.addItems(self.SPANOPTIONS)
+        self.span_cb.currentIndexChanged.connect(self.set_min_max_dates)
 
         self.step_lb1 = QLabel('Select Step:')
         self.step_cb = QComboBox(self)
@@ -181,17 +183,12 @@ class customParametersWidget(QWidget):
 
         self.start_year_lb1 = QLabel('Start Year:')
         self.start_year_int = QSpinBox(self)
-        self.start_year_int.setMinimum(1994)
-        self.start_year_int.setMaximum(2021)
-        self.start_year_int.setValue(2020)
         self.start_year_int.setSingleStep(1)
         self.start_year_int.setWrapping(True)
+        self.start_year_int.valueChanged.connect(self.set_min_max_dates)
 
         self.end_year_lb1 = QLabel('End Year:')
         self.end_year_int = QSpinBox(self)
-        self.end_year_int.setMinimum(1994)
-        self.end_year_int.setMaximum(2021)
-        self.end_year_int.setValue(2020)
         self.end_year_int.setSingleStep(1)
         self.end_year_int.setWrapping(True)
 
@@ -269,6 +266,21 @@ class customParametersWidget(QWidget):
         self.export_option = arg0
         self.export_ln.setVisible(arg1)
         self.export_btn.setVisible(arg1)
+
+    def set_min_max_dates(self):
+        parameter = self.parm_cb.currentText()
+        span = self.span_cb.currentText()
+        if span == 'Calendar Year':
+            start = self.IMAGECOLLECTION_JSON[parameter]['calendar_start']
+            end = self.IMAGECOLLECTION_JSON[parameter]['calendar_end']
+        else:
+            start = self.IMAGECOLLECTION_JSON[parameter]['hydrological_start']
+            end = self.IMAGECOLLECTION_JSON[parameter]['hydrological_end']
+        self.start_year_int.setMinimum(start)
+        self.start_year_int.setMaximum(end)
+        self.end_year_int.setMinimum(self.start_year_int.value())
+        self.end_year_int.setValue(self.start_year_int.value())
+        self.end_year_int.setMaximum(end)
 
     def browse(self):
         self.export_path = QFileDialog.getSaveFileName(
