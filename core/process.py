@@ -1,16 +1,14 @@
 import ee
 import json
-from qgis.core import QgsJsonExporter, QgsProcessingFeedback
+from qgis.core import QgsJsonExporter, QgsProcessingFeedback, QgsVectorLayer
 from typing import Optional
 
 from .helper import Assistant
 
-ee.Initialize()
-
-
 class GeoCogs:
     PREFERENCES = Assistant.read_preferences()
-    def __init__(self, params = None) -> None:
+    
+    def set_params(self, params = None) -> None:
         self.params = params
         self._params = {
             'band': None,
@@ -30,7 +28,7 @@ class GeoCogs:
             for param in self.params:
                 self._params[param] = self.params.get(param, self._params[param])
 
-    def layer2ee(self, active_lyr, selected: bool = False, feedback: Optional[QgsProcessingFeedback] = None):
+    def layer2ee(self, active_lyr: QgsVectorLayer, selected: bool = False, feedback: Optional[QgsProcessingFeedback] = None) -> None:
         def convert2ee(active_lyr, features):
             lyr = QgsJsonExporter(active_lyr)
             gs = lyr.exportFeatures(features)
@@ -41,9 +39,9 @@ class GeoCogs:
         selected_count = active_lyr.selectedFeatureCount()
         if selected:
             if feedback: Assistant.logger(feedback, f'selected features: {selected_count}')
-            return convert2ee(active_lyr, active_lyr.selectedFeatures())
+            self.ee_featurecollection = convert2ee(active_lyr, active_lyr.selectedFeatures())
         else:
-            return convert2ee(active_lyr, active_lyr.getFeatures())
+            self.ee_featurecollection = convert2ee(active_lyr, active_lyr.getFeatures())
     
     def reduce2imagecollection(self, ic: ee.ImageCollection, fc: ee.FeatureCollection, start_year: int, end_year: int, span: str, step: str) -> ee.ImageCollection:
         years_range = range(start_year, end_year+1)
@@ -64,7 +62,7 @@ class GeoCogs:
                 date_range = [f'{year}-{self.PREFERENCES["dateTime"]["hydrologicalYearStartMonth"]:02d}-01' for year in years_range]
         return ee.ImageCollection.fromImages(ee.List(date_range).map(lambda x: self._composite(x, ic, fc, unit)))
     
-    def zonal_stats(self, ic, fc):
+    def zonal_stats(self, ic: ee.ImageCollection, fc: ee.FeatureCollection) -> ee.FeatureCollection:
         img_rep = ic.first()
         non_system_img_props = ee.Feature(None).copyProperties(img_rep).propertyNames()
         if not self._params['bands']:
@@ -76,7 +74,7 @@ class GeoCogs:
         if not self._params['imgPropsRename']:
             self._params['imgPropsRename'] = self._params['imgProps']
 
-        def _get_stats(img):
+        def _get_stats(img: ee.Image):
             img = ee.Image(img.select(self._params['bands'], self._params['bandsRename'])) \
                 .set(self._params['datetimeName'], img.date().format(self._params['datetimeFormat'])) \
                 .set('timestamp', img.get('system:time_start'))
@@ -97,11 +95,11 @@ class GeoCogs:
 
         return results
 
-    def _composite(self, date, ic, fc, unit):
+    def _composite(self, date: str, ic: ee.ImageCollection, fc: ee.FeatureCollection, unit: str) -> ee.Image:
         start_date = ee.Date(date)
         end_date = start_date.advance(1, unit)
         return ee.Image(ic.filterDate(
             start_date, end_date
-            ).filterBounds(fc).reduce(
+            ).filterBounds(fc).select([self._params.get('band')]).reduce(
                 self._params.get('temp_reducer')
                 ).rename(self._params.get('band')).set('system:time_start', start_date.millis()))
