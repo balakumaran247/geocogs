@@ -14,6 +14,18 @@ class Assistant:
     IMAGECOLLECTIONS_JSON = os.path.join(CMD_FOLDER, 'imagecollections.json')
     PREFERENCES_YAML = os.path.join(
         CMD_FOLDER.replace(r'\core', ''), 'preferences.yaml')
+    DISCLAIMER = "error due to intense computation. \
+        Please consider the following suggestions. \
+        1. Reduce the number of features in the AOI layer. \
+        2. Reduce the number of years in the date range. \
+        3. Change the scale and tileScale values as per the requirements."
+    DRIVE_MSG = {
+        'Output': 'Output will be saved in the Google Drive.',
+        'Status': 'visit \
+            https://code.earthengine.google.co.in/tasks or \
+            https://console.cloud.google.com/earth-engine/tasks',
+        'If_Failed': DISCLAIMER
+    }
 
     @staticmethod
     def read_preferences() -> Dict:
@@ -128,3 +140,16 @@ class Assistant:
                 out_dict[name] = {date: val}
         df = pd.DataFrame(out_dict).T
         df.to_csv(filepath)
+    
+    @staticmethod
+    def default_path():
+        if DEFAULT_PATH := Assistant.read_preferences()['defaults']['defaultPath']:
+            Assistant._check_directory(DEFAULT_PATH)
+        else:
+            DEFAULT_PATH = os.path.join(os.path.expanduser("~"), 'Desktop', 'GeoCogs_Output.csv')
+        return DEFAULT_PATH
+
+    @staticmethod
+    def _check_directory(path: str) -> None:
+        dir_name = os.path.dirname(path)
+        if not os.path.exists(dir_name): raise NotADirectoryError(f'{dir_name} not found')

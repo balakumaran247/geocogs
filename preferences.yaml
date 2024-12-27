@@ -6,3 +6,4 @@ dateTime:
 defaults:
   defaultScale: 100
   defaultYear: 2019
+  defaultPath: 
