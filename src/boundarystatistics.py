@@ -21,10 +21,14 @@ from qgis.PyQt.QtWidgets import (QAction, QButtonGroup, QCheckBox, QComboBox,
                                  QListWidget, QListWidgetItem, QMenu,
                                  QPushButton, QRadioButton, QSpinBox, QWidget)
 
+import ee
+from ..core.gee import ImageCollections, Reducers
+from ..core.helper import Assistant
+from ..core.process import GeoCogs
 # https://gis.stackexchange.com/questions/465952/how-to-chose-a-vector-layer-chose-a-field-then-chose-values-using-parameterase
 
 
-class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
+class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, GeoCogs):
     INPUT_PARAMS = 'INPUT_PARAMS'
 
     def initAlgorithm(self, config=None):
@@ -41,15 +45,13 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
                 'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
         kwargs = dict(zip(keys, user_options))
 
-        from ..core.gee import ImageCollections, Reducers
-        from ..core.helper import Assistant
-        from ..core.process import GeoCogs
+        ee.Initialize()
         
-        ic = ImageCollections(kwargs['PARAMETER'])
+        self.set_parameter(kwargs['PARAMETER'])
         params = {
-            'band': ic.band,
-            'temp_reducer': Reducers(kwargs['TEMPORALSTAT'])(),
-            'spat_reducer': Reducers(kwargs['SPATIALSTAT'])(), 
+            'band': self.band,
+            'temp_reducer': self.ee_reducer(kwargs['TEMPORALSTAT']),
+            'spat_reducer': self.ee_reducer(kwargs['SPATIALSTAT']),
             'scale': kwargs['SCALE'],
             'tileScale': kwargs['TILESCALE'],
             'crs': None,
@@ -61,64 +63,13 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm):
             'datetimeFormat': 'YYYY-MM-dd'
         }
 
-        ic.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
+        self.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
 
-        core = GeoCogs(params)
-        fc = core.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
-        ic_reduced = core.reduce2imagecollection(ic.ee_object, fc, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
-        return kwargs
+        self.set_params(params)
+        self.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
+        ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
+        return {'Output': 'Done'}
 
-    # def set_feedback(self, feedback, perc):
-    #     if feedback.isCanceled():
-    #         raise QgsProcessingException('Processing Canceled.')
-    #     feedback.setProgress(int(perc))
-
-    # def processAlgorithm(self, parameters, context, feedback):
-    #     source_lyr = self.parameterAsVectorLayer(parameters, self.INPUT, context)
-    #     print(source_lyr)
-    #     year = self.parameterAsInt(parameters, self.YEAR, context)
-    #     yr_span = self.parameterAsInt(parameters,self.SPAN,context)
-    #     param = self.parameterAsInt(parameters, self.PARAMETER, context)
-    #     step = self.parameterAsInt(parameters, self.TEMPORALSTEP, context)
-    #     temp_reducer = self.parameterAsInt(parameters, self.TEMPORALSTAT, context)
-    #     spat_reducer = self.parameterAsInt(parameters, self.SPATIALSTAT, context)
-    #     col_name = self.parameterAsString(parameters, self.COLNAME, context)
-    #     out_csv = self.parameterAsFileOutput(parameters, self.OUTPUT, context)
-
-    #     step = self.STEPOPTIONS[step]
-    #     yr_span = self.SPANOPTIONS[yr_span]
-    #     temp_reducer = self.REDUCERS[temp_reducer]
-    #     spat_reducer = self.REDUCERS[spat_reducer]
-    #     param = self.DATASETS[param]
-
-    #     if col_name not in [field.name() for field in source_lyr.fields()]:
-    #         raise QgsProcessingException('Unique Field Heading not available.')
-
-    #     from .boundarystatisticscore import BoundaryWiseStats
-    #     from ..utils import get_feature_collection
-
-    #     self.set_feedback(feedback,1)
-    #     f_col = get_feature_collection(source_lyr)
-    #     self.set_feedback(feedback,15)
-    #     bws = BoundaryWiseStats(f_col,param,year,spat_reducer,temp_reducer,step)
-    #     bws.set_image_coll()
-    #     self.set_feedback(feedback,20)
-    #     bws.make_date_range_list(yr_span)
-    #     self.set_feedback(feedback,25)
-    #     bws.filter_image_coll()
-    #     self.set_feedback(feedback,30)
-    #     bws.set_temporal_reducer()
-    #     bws.set_spatial_reducer()
-    #     self.set_feedback(feedback,35)
-    #     bws.temp_reduce_image_coll()
-    #     self.set_feedback(feedback,45)
-    #     bws.get_boundarywisestats()
-    #     self.set_feedback(feedback,60)
-    #     bws.get_out_dict(col_name,(feedback,self.set_feedback,60,38))
-    #     self.set_feedback(feedback,98)
-    #     bws.export_csv(out_csv)
-    #     self.set_feedback(feedback,100)
-    #     return {self.OUTPUT: out_csv}
 
     def name(self):
         return 'boundary_stats'
