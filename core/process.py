@@ -11,7 +11,7 @@ class GeoCogs:
     def set_params(self, params = None) -> None:
         self.params = params
         self._params = {
-            'band': None,
+            'select_band': None,
             'temp_reducer': ee.Reducer.mean(),
             'spat_reducer': ee.Reducer.mean(),
             'scale': self.PREFERENCES['defaults']['defaultScale'],
@@ -21,8 +21,8 @@ class GeoCogs:
             'bandsRename': None,
             'imgProps': None,
             'imgPropsRename': None,
-            'datetimeName': 'date',#time',
-            'datetimeFormat': 'YYYY-MM-dd'# HH:mm:ss'
+            'datetimeName': 'date',
+            'datetimeFormat': 'YYYY-MM-dd'
         }
         if self.params:
             for param in self.params:
@@ -74,15 +74,18 @@ class GeoCogs:
         if not self._params['imgPropsRename']:
             self._params['imgPropsRename'] = self._params['imgProps']
 
-        def _get_stats(img: ee.Image):
-            img = ee.Image(img.select(self._params['bands'], self._params['bandsRename'])) \
-                .set(self._params['datetimeName'], img.date().format(self._params['datetimeFormat'])) \
-                .set('timestamp', img.get('system:time_start'))
+        def _get_stats(img: ee.Image) -> ee.FeatureCollection:
+            # img = ee.Image(img.select(self._params['bands'], self._params['bandsRename'])) \
+            #     .set(self._params['datetimeName'], img.date().format(self._params['datetimeFormat'])) \
+            #     .set('timestamp', img.get('system:time_start'))
 
-            props_from = ee.List(self._params['imgProps']).cat(ee.List([self._params['datetimeName'], 'timestamp']))
-            props_to = ee.List(self._params['imgPropsRename']).cat(ee.List([self._params['datetimeName'], 'timestamp']))
-            img_props = img.toDictionary(props_from).rename(props_from, props_to)
+            # props_from = ee.List(self._params['imgProps']).cat(ee.List([self._params['datetimeName'], 'timestamp']))
+            # props_to = ee.List(self._params['imgPropsRename']).cat(ee.List([self._params['datetimeName'], 'timestamp']))
+            # img_props = img.toDictionary(props_from).rename(props_from, props_to)
 
+            img = ee.Image(img.set(self._params['datetimeName'], img.date().format(self._params['datetimeFormat'])).set('timestamp', img.get('system:time_start')))
+            props = ee.List([self._params['datetimeName'], 'timestamp'])
+            img_props = img.toDictionary(props)
             return img.reduceRegions(
                 collection=fc,
                 reducer=self._params['spat_reducer'],
@@ -91,7 +94,7 @@ class GeoCogs:
                 tileScale=self._params['tileScale']
             ).map(lambda f: f.set(img_props))
 
-        results = ic.map(_get_stats).flatten().filter(ee.Filter.notNull(self._params['bandsRename']))
+        results = ic.map(_get_stats).flatten()#.filter(ee.Filter.notNull(self._params['bandsRename']))
 
         return results
 
@@ -100,6 +103,6 @@ class GeoCogs:
         end_date = start_date.advance(1, unit)
         return ee.Image(ic.filterDate(
             start_date, end_date
-            ).filterBounds(fc).select([self._params.get('band')]).reduce(
+            ).filterBounds(fc).select([self._params.get('select_band')]).reduce(
                 self._params.get('temp_reducer')
-                ).rename(self._params.get('band')).set('system:time_start', start_date.millis()))
+                ).rename(self._params.get('select_band')).set('system:time_start', start_date.millis()))

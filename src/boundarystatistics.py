@@ -49,7 +49,7 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
         
         self.set_parameter(kwargs['PARAMETER'])
         params = {
-            'band': self.band,
+            'select_band': self.band,
             'temp_reducer': self.ee_reducer(kwargs['TEMPORALSTAT']),
             'spat_reducer': self.ee_reducer(kwargs['SPATIALSTAT']),
             'scale': kwargs['SCALE'],
@@ -60,7 +60,7 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             'imgProps': None,
             'imgPropsRename': None,
             'datetimeName': 'date',
-            'datetimeFormat': 'YYYY-MM-dd'
+            'datetimeFormat': 'YYYY-MM'
         }
 
         self.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
@@ -68,7 +68,12 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
         self.set_params(params)
         self.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
         ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
-        return {'Output': 'Done'}
+        get_stats = self.zonal_stats(ic_reduced, self.ee_featurecollection)
+        if kwargs['EXPORT_TO'] == 'local':
+            stats = get_stats.getInfo()
+            Assistant.export2csv(stats, kwargs['EXPORT_PATH'], kwargs['SPATIALSTAT'], kwargs['INPUT_FIELD'], params['datetimeName'])
+            summary = {'Output': kwargs['EXPORT_PATH']}
+        return summary
 
 
     def name(self):
@@ -206,7 +211,7 @@ class customParametersWidget(QWidget):
 
         self.export_btn = QPushButton('Browse')
         self.export_btn.clicked.connect(self.browse)
-        self.export_ln = QLineEdit('Path to export CSV file', self)
+        self.export_ln = QLineEdit(os.path.join(os.path.expanduser("~"), 'Desktop', 'GeoCogs_Output.csv'), self)
 
         self.layout = QGridLayout()
         self.layout.addWidget(self.lyr_lbl, 0, 0, 1, 1)

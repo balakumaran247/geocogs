@@ -2,6 +2,8 @@ import inspect
 import json
 import os
 from typing import Dict, Optional
+import numpy as np
+import pandas as pd
 
 import yaml
 from qgis.core import QgsProcessingException, QgsProcessingFeedback
@@ -94,3 +96,35 @@ class Assistant:
         feedback.setProgress(perc)
         if text:
             feedback.setProgressText(text)
+
+    @staticmethod
+    def export2csv(data: Dict, filepath: str, reducer_key: str, unique_key: str, date_key: str) -> None:
+        """Export data to a CSV file.
+
+        Args:
+            data (Dict): The data to export.
+            filepath (str): The path where the CSV file will be saved.
+            reducer_key (str): The key used to reduce the data.
+            unique_key (str): The key used to uniquely identify each entry.
+            date_key (str): The key used to identify the date in the data.
+        """
+        reducer_key = reducer_key.lower()
+        out_dict = {}
+        for feature in data['features']:
+            props = feature['properties']
+            if (
+                date_key not in props
+                or unique_key not in props
+                or reducer_key not in props
+            ):
+                raise KeyError(
+                    f'{date_key}, {unique_key}, or {reducer_key} not found in stats properties')
+            date = props[date_key]
+            name = props[unique_key]
+            val = props[reducer_key]
+            if name in out_dict:
+                out_dict[name][date] = val
+            else:
+                out_dict[name] = {date: val}
+        df = pd.DataFrame(out_dict).T
+        df.to_csv(filepath)
