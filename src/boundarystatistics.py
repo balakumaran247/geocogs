@@ -2,30 +2,21 @@ import inspect
 import os
 from datetime import datetime
 
+import ee
 from processing.gui.wrappers import WidgetWrapper
 from PyQt5.QtCore import QCoreApplication
-from qgis.core import (QgsMapLayerProxyModel, QgsProcessing,
-                       QgsProcessingAlgorithm, QgsProcessingException,
-                       QgsProcessingOutputFile, QgsProcessingParameterEnum,
-                       QgsProcessingParameterFeatureSource,
-                       QgsProcessingParameterFileDestination,
-                       QgsProcessingParameterMatrix,
-                       QgsProcessingParameterNumber,
-                       QgsProcessingParameterString,
-                       QgsProcessingParameterVectorLayer)
-from qgis.gui import (QgsExternalStorageFileWidget, QgsFieldComboBox,
-                      QgsMapLayerComboBox)
+from qgis.core import (QgsMapLayerProxyModel, QgsProcessingAlgorithm,
+                       QgsProcessingException, QgsProcessingParameterMatrix,
+                       QgsVectorLayer)
+from qgis.gui import QgsFieldComboBox, QgsMapLayerComboBox
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import (QAction, QButtonGroup, QCheckBox, QComboBox,
+from qgis.PyQt.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
                                  QFileDialog, QGridLayout, QLabel, QLineEdit,
-                                 QListWidget, QListWidgetItem, QMenu,
                                  QPushButton, QRadioButton, QSpinBox, QWidget)
 
-import ee
 from ..core.gee import ImageCollections, Reducers
 from ..core.helper import Assistant
 from ..core.process import GeoCogs
-# https://gis.stackexchange.com/questions/465952/how-to-chose-a-vector-layer-chose-a-field-then-chose-values-using-parameterase
 
 
 class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, GeoCogs):
@@ -45,9 +36,10 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
                 'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
         kwargs = dict(zip(keys, user_options))
 
-        Assistant.set_progressbar_perc(feedback, 10, 'Initializing Earth Engine...')
+        Assistant.set_progressbar_perc(
+            feedback, 10, 'Initializing Earth Engine...')
         ee.Initialize()
-        
+
         self.set_parameter(kwargs['PARAMETER'])
         params = {
             'select_band': self.band,
@@ -56,37 +48,39 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             'scale': kwargs['SCALE'],
             'tileScale': kwargs['TILESCALE'],
             'crs': None,
-            'bands': None,
-            'bandsRename': None,
-            'imgProps': None,
-            'imgPropsRename': None,
             'datetimeName': 'date',
             'datetimeFormat': 'YYYY-MM'
         }
 
-        Assistant.set_progressbar_perc(feedback, 20, 'Updating Metadata... (takes time)')
+        Assistant.set_progressbar_perc(
+            feedback, 20, 'Updating Metadata... (takes time)')
         self.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
 
         self.set_params(params)
-        Assistant.set_progressbar_perc(feedback, 50, 'Converting Layer to EE FeatureCollection...')
-        self.layer2ee(kwargs['INPUT_LAYER'], kwargs['SELECTED_FEATURES'], feedback)
-        ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection, kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
-        Assistant.set_progressbar_perc(feedback, 60, 'Checking ImageCollection...')
+        Assistant.set_progressbar_perc(
+            feedback, 50, 'Converting Layer to EE FeatureCollection...')
+        self.layer2ee(kwargs['INPUT_LAYER'],
+                      kwargs['SELECTED_FEATURES'], feedback)
+        ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection,
+                                                 kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
+        Assistant.set_progressbar_perc(
+            feedback, 60, 'Checking ImageCollection...')
         self.check_imagecollection(ic_reduced)
         get_stats = self.zonal_stats(ic_reduced, self.ee_featurecollection)
-        Assistant.set_progressbar_perc(feedback, 80, 'Calculation & Exporting Data...')
+        Assistant.set_progressbar_perc(
+            feedback, 80, 'Calculation & Exporting Data...')
         if kwargs['EXPORT_TO'] == 'local':
             try:
                 stats = get_stats.getInfo()
             except Exception as e:
                 raise QgsProcessingException(Assistant.DISCLAIMER) from e
             Assistant._check_directory(kwargs['EXPORT_PATH'])
-            Assistant.export2csv(stats, kwargs['EXPORT_PATH'], kwargs['SPATIALSTAT'], kwargs['INPUT_FIELD'], params['datetimeName'])
+            Assistant.export2csv(
+                stats, kwargs['EXPORT_PATH'], kwargs['SPATIALSTAT'], kwargs['INPUT_FIELD'], params['datetimeName'])
             return {'Output': kwargs['EXPORT_PATH']}
         else:
             self.export2drive(get_stats, f'GeoCogs_{self.layer_name}')
             return Assistant.DRIVE_MSG
-
 
     def name(self):
         return 'boundary_stats'
@@ -112,15 +106,24 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
 
 
 class BoundaryStatsWidget(WidgetWrapper):
+    """
+    A widget wrapper class for boundary statistics.
+    Methods
+    -------
+    createWidget():
+        Creates and returns a custom parameters widget.
+    value():
+        Retrieves and returns the current values from the custom widget.
+    """
 
     def createWidget(self):
         self.custom_widget = customParametersWidget()
         return self.custom_widget
 
     def value(self):
-        source_layer = self.custom_widget.lyr_cb.currentLayer()  # get_layer()
+        source_layer = self.custom_widget.lyr_cb.currentLayer()
         selected_features = self.custom_widget.onlyselected_cb.isChecked()
-        source_field = self.custom_widget.fld_cb.currentField()  # get_field()
+        source_field = self.custom_widget.fld_cb.currentField()
         parameter = self.custom_widget.parm_cb.currentText()
         span = self.custom_widget.span_cb.currentText()
         step = self.custom_widget.step_cb.currentText()
@@ -138,8 +141,28 @@ class BoundaryStatsWidget(WidgetWrapper):
             tilescale, export_to, export_path
         ]
 
+# https://gis.stackexchange.com/questions/465952/how-to-chose-a-vector-layer-chose-a-field-then-chose-values-using-parameterase
+
 
 class customParametersWidget(QWidget):
+    """
+    A custom widget for selecting parameters and options for boundary statistics in QGIS.
+    Attributes:
+        PARAMETERS (list): List of available parameters for selection.
+        SPANOPTIONS (list): List of span options for selection.
+        STEPOPTIONS (list): List of step options for selection.
+        REDUCERS (list): List of reducers for spatial and temporal reduction.
+        TILESCALE (list): List of tile scale options.
+        DEFAULT_PATH (str): Default path for exporting data.
+        IMAGECOLLECTION_JSON (dict): JSON data containing image collection information.
+    Methods:
+        __init__(): Initializes the customParametersWidget with various UI components.
+        export_type(): Handles the export type selection and updates UI accordingly.
+        _export_type_behaviour(arg0, arg1): Updates the export option and visibility of export path components.
+        set_min_max_dates(): Sets the minimum and maximum dates based on the selected parameter and span.
+        browse(): Opens a file dialog to select the export path.
+        layer_changed(lyr): Updates the field combo box based on the selected layer.
+    """
     PARAMETERS = [
         'IMD Rainfall',
         'IMD Max Temperature',
@@ -256,18 +279,40 @@ class customParametersWidget(QWidget):
 
         self.setLayout(self.layout)
 
-    def export_type(self):
+    def export_type(self) -> None:
+        """
+        Determines the export type based on the state of the radio buttons and 
+        calls the appropriate export type behavior.
+        If the first radio button (export_rb1) is checked, it sets the export type 
+        to 'local' and enables the corresponding behavior. Otherwise, it sets the 
+        export type to 'drive' and disables the corresponding behavior.
+        """
         if self.export_rb1.isChecked():
             self._export_type_behaviour('local', True)
         else:
             self._export_type_behaviour('drive', False)
 
-    def _export_type_behaviour(self, arg0, arg1):
+    def _export_type_behaviour(self, arg0: str, arg1: bool) -> None:
+        """
+        Sets the export option and controls the visibility of export-related UI elements.
+        Args:
+            arg0 (str): The export option to be set.
+            arg1 (bool): A flag indicating whether the export-related UI elements should be visible.
+        """
         self.export_option = arg0
         self.export_ln.setVisible(arg1)
         self.export_btn.setVisible(arg1)
 
-    def set_min_max_dates(self):
+    def set_min_max_dates(self) -> None:
+        """
+        Sets the minimum and maximum dates for the start and end year input fields
+        based on the selected parameter and span.
+        The method retrieves the selected parameter from the parameter combo box
+        and the selected span from the span combo box. Depending on whether the
+        span is 'Calendar Year' or not, it fetches the corresponding start and end
+        dates from the IMAGECOLLECTION_JSON dictionary. It then sets these dates
+        as the minimum and maximum values for the start and end year input fields.
+        """
         parameter = self.parm_cb.currentText()
         span = self.span_cb.currentText()
         if span == 'Calendar Year':
@@ -282,10 +327,25 @@ class customParametersWidget(QWidget):
         self.end_year_int.setValue(self.start_year_int.value())
         self.end_year_int.setMaximum(end)
 
-    def browse(self):
+    def browse(self) -> None:
+        """
+        Opens a file dialog to select a location and name for saving a CSV file.
+        This method uses QFileDialog to open a 'Save As' dialog, allowing the user to specify
+        the path and filename for exporting a CSV file. The selected path is then set to the
+        export_path attribute and displayed in the export_ln widget.
+        Returns:
+            None
+        """
         self.export_path = QFileDialog.getSaveFileName(
             None, self.tr("Save As"), None, self.tr("CSV files (*.csv)"))
         self.export_ln.setText(self.export_path[0])
 
-    def layer_changed(self, lyr):
+    def layer_changed(self, lyr: QgsVectorLayer) -> None:
+        """
+        Updates the field combo box with the given vector layer.
+        This method is called when the layer is changed. It sets the new layer
+        to the field combo box.
+        Args:
+            lyr (QgsVectorLayer): The new vector layer to be set.
+        """
         self.fld_cb.setLayer(lyr)

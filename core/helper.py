@@ -2,8 +2,8 @@ import inspect
 import json
 import os
 from typing import Dict, Optional
-import pandas as pd
 
+import pandas as pd
 import yaml
 from qgis.core import QgsProcessingException, QgsProcessingFeedback
 
@@ -139,16 +139,33 @@ class Assistant:
                 out_dict[name] = {date: val}
         df = pd.DataFrame(out_dict).T
         df.to_csv(filepath)
-    
+
     @staticmethod
     def default_path():
+        """
+        Determines the default path for GeoCogs output.
+        This function reads the user's preferences to find the default path for saving GeoCogs output.
+        If a default path is specified in the preferences, it checks if the directory exists.
+        If no default path is specified, it sets the default path to the user's Desktop with the filename 'GeoCogs_Output.csv'.
+        Returns:
+            str: The default path for GeoCogs output.
+        """
         if DEFAULT_PATH := Assistant.read_preferences()['defaults']['defaultPath']:
             Assistant._check_directory(DEFAULT_PATH)
         else:
-            DEFAULT_PATH = os.path.join(os.path.expanduser("~"), 'Desktop', 'GeoCogs_Output.csv')
+            DEFAULT_PATH = os.path.join(os.path.expanduser(
+                "~"), 'Desktop', 'GeoCogs_Output.csv')
         return DEFAULT_PATH
 
     @staticmethod
     def _check_directory(path: str) -> None:
+        """
+        Checks if the directory of the given path exists.
+        Args:
+            path (str): The file path for which the directory needs to be checked.
+        Raises:
+            QgsProcessingException: If the directory does not exist.
+        """
         dir_name = os.path.dirname(path)
-        if not os.path.exists(dir_name): raise QgsProcessingException(f'{dir_name} not found')
+        if not os.path.exists(dir_name):
+            raise QgsProcessingException(f'{dir_name} not found')

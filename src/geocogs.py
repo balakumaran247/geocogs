@@ -3,7 +3,7 @@ import os
 
 import processing
 from PyQt5.QtWidgets import QAction
-from qgis.core import QgsApplication, QgsProcessingAlgorithm
+from qgis.core import QgsApplication
 from qgis.PyQt.QtGui import QIcon
 
 from .about.about import AboutPlugin

@@ -1,18 +1,4 @@
 {
-    "IMD Min Temperature": {
-        "id": "users/jaltolwelllabs/IMD/minTemp",
-        "band": "b1",
-        "start_year": 2000,
-        "start_month": 1,
-        "start_day": 1,
-        "end_year": 2020,
-        "end_month": 12,
-        "end_day": 31,
-        "calendar_start": 2000,
-        "hydrological_start": 2000,
-        "calendar_end": 2020,
-        "hydrological_end": 2019
-    },
     "Dynamic World V1": {
         "id": "GOOGLE/DYNAMICWORLD/V1",
         "band": "label",
@@ -21,7 +7,7 @@
         "start_day": 27,
         "end_year": 2024,
         "end_month": 12,
-        "end_day": 27,
+        "end_day": 28,
         "calendar_start": 2016,
         "hydrological_start": 2016,
         "calendar_end": 2024,
@@ -69,5 +55,19 @@
         "calendar_end": 2020,
         "hydrological_end": 2019
     },
-    "last_update": "2024-12-27"
+    "IMD Min Temperature": {
+        "id": "users/jaltolwelllabs/IMD/minTemp",
+        "band": "b1",
+        "start_year": 2000,
+        "start_month": 1,
+        "start_day": 1,
+        "end_year": 2020,
+        "end_month": 12,
+        "end_day": 31,
+        "calendar_start": 2000,
+        "hydrological_start": 2000,
+        "calendar_end": 2020,
+        "hydrological_end": 2019
+    },
+    "last_update": "2024-12-28"
 }

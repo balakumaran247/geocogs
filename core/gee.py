@@ -9,13 +9,15 @@ from qgis.core import QgsProcessingFeedback, QgsProcessingException
 
 from .helper import Assistant
 
+
 class ImageCollections:
     TIMESTAMP_LABEL = 'system:time_start'
     CALENDAR_START_MONTH = 1
     CALENDAR_END_MONTH = 12
-    HYDROLOGICAL_START_MONTH = Assistant.read_preferences()['dateTime']['hydrologicalYearStartMonth']
+    HYDROLOGICAL_START_MONTH = Assistant.read_preferences(
+    )['dateTime']['hydrologicalYearStartMonth']
     HYDROLOGICAL_END_MONTH = HYDROLOGICAL_START_MONTH - 1
-    
+
     def set_parameter(self, parameter: str) -> None:
         """
         Sets the parameter for the ImageCollection class.
@@ -42,7 +44,9 @@ class ImageCollections:
             feedback (QgsProcessingFeedback): The feedback object.
         """
         if not imagecollection.size().getInfo():
-            raise QgsProcessingException(f'No images found in reduced {self.parameter} collection')
+            raise QgsProcessingException(
+                f'No images found in reduced {self.parameter} collection'
+            )
 
     @staticmethod
     def _get_date(asset: Any, start_date: ee.Date, advance_count: int) -> datetime:
@@ -171,12 +175,14 @@ class ImageCollections:
             out_dict['last_update'] = date
             Assistant.write_json(out_dict)
             end_time = perf_counter()
-            if feedback: Assistant.logger(
-                feedback,
-                f"Metadata updated in {end_time - start_time:.2f} seconds",
-                True
-            )
-        if feedback: Assistant.logger(feedback, 'Metadata is up to date', True)
+            if feedback:
+                Assistant.logger(
+                    feedback,
+                    f"Metadata updated in {end_time - start_time:.2f} seconds",
+                    True
+                )
+        if feedback:
+            Assistant.logger(feedback, 'Metadata is up to date', True)
 
 
 @dataclass
