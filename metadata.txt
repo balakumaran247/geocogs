@@ -1,10 +1,11 @@
 [general]
 name=GeoCogs
-description=This plugin is a collection of geoprocessing tools for automation
-version=0.8
-qgisMinimumVersion=3.0
+description=This plugin is a collection of geoprocessing tools for data retrieval and statistics
+version=0.9
+qgisMinimumVersion=3.28
 author=Balakumaran Ramachandran
 email=balakumaran247@gmail.com
 icon=icon.png
 hasProcessingProvider=yes
+repository=https://github.com/balakumaran247/geocogs
 changelog=Refer CHANGELOG.md

@@ -1,9 +1,8 @@
 # Changelog
 ## v0.9
-### Fix
-- GEE assets
-- Removed IITB ET, GW datasets from boundarystatistics
-- Temporal stats calculation of IITB ET
+### Revamped
+- built GeoCogs from groundup for efficiency
+- included new BoundaryStatistics feature
 ## v0.8
 ### Feature
 - added Coefficient of Variation processing tool
