@@ -18,3 +18,9 @@ If any error encountered please try out the following,
 2. Reduce the number of years in the date range.
 3. Change the scale and tileScale values as required.
 4. Reduce the number of features in the Input layer.
+
+# Screenshots
+Boundary Statisics         |  LULC Statistics
+:-------------------------:|:-------------------------:
+<img width="509" alt="image" src="https://github.com/user-attachments/assets/6b57d1f0-20bd-40ac-beb6-12e6c580d628" />|<img width="508" alt="image" src="https://github.com/user-attachments/assets/bd765a6a-2107-4fb3-a0bd-bbe5376bbcd6" />
+
