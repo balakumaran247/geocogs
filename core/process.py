@@ -136,6 +136,23 @@ class GeoCogs:
 
         return results
 
+    def class2area(self, image: ee.Image) -> ee.FeatureCollection:
+        """
+        Computes the area of each class in an Earth Engine Image.
+        Args:
+            image (ee.Image): The input Image for which to compute class areas.
+        Returns:
+            ee.FeatureCollection: A FeatureCollection containing the computed areas for each class.
+        """
+        image = image.select(self._params.get('select_band'))
+        area_image = ee.Image.pixelArea().rename("area").addBands(image)
+        return area_image.reduceRegions(
+            collection=self.ee_featurecollection,
+            reducer=ee.Reducer.sum().group(1, 'lulc_class'),
+            scale=self._params['scale'],
+            crs=self._params['crs']
+        )
+
     def export2drive(self, data: ee.FeatureCollection, filename: str) -> None:
         """
         Exports a given Earth Engine FeatureCollection to Google Drive as a CSV file.
