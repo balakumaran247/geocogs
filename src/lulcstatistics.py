@@ -35,6 +35,39 @@ class LulcStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, Geo
                 'START_YEAR', 'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
         kwargs = dict(zip(keys, user_options))
 
+        Assistant.set_progressbar_perc(
+            feedback, 10, 'Initializing Earth Engine...')
+        ee.Initialize()
+
+        self.set_parameter(kwargs['PARAMETER'])
+        params = {
+            'select_band': self.band,
+            'scale': kwargs['SCALE'],
+            'tileScale': kwargs['TILESCALE'],
+            'temp_reducer': ee.Reducer.mode(),
+            'spat_reducer': ee.Reducer.sum().group(1, 'lulc_class'),
+            'crs': None,
+            'datetimeName': 'date',
+            'datetimeFormat': 'YYYY-MM'
+        }
+
+        Assistant.set_progressbar_perc(
+            feedback, 20, 'Updating Metadata... (takes time)')
+        self.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
+        
+        self.set_params(params)
+        Assistant.set_progressbar_perc(
+            feedback, 50, 'Converting Layer to EE FeatureCollection...')
+        self.layer2ee(kwargs['INPUT_LAYER'],
+                      kwargs['SELECTED_FEATURES'], feedback)
+        ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection,
+                                                 kwargs['START_YEAR'], kwargs['START_YEAR'], kwargs['SPAN'], 'Yearly')
+        Assistant.set_progressbar_perc(
+            feedback, 60, 'Checking ImageCollection...')
+        self.check_imagecollection(ic_reduced)
+        ic_area = ic_reduced.map(self.add_area_band)
+        get_stats = self.zonal_stats(ic_area)
+        print(get_stats.getInfo()['features'][0]['properties'])
         return kwargs
 
     def name(self):

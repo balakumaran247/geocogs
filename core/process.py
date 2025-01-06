@@ -53,7 +53,7 @@ class GeoCogs:
         selected_count = active_lyr.selectedFeatureCount()
         self.layer_name = active_lyr.name()
         try:
-            if selected:
+            if selected and selected_count:
                 if feedback:
                     Assistant.logger(
                         feedback,
@@ -110,15 +110,17 @@ class GeoCogs:
                 ]
         return ee.ImageCollection.fromImages(ee.List(date_range).map(lambda x: self._composite(x, ic, fc, unit)))
 
-    def zonal_stats(self, ic: ee.ImageCollection, fc: ee.FeatureCollection) -> ee.FeatureCollection:
+    def zonal_stats(self, ic: ee.ImageCollection, fc: Optional[ee.FeatureCollection] = None) -> ee.FeatureCollection:
         """
-        Computes zonal statistics for an Earth Engine ImageCollection over a given FeatureCollection.
+        Computes zonal statistics for an Earth Engine ImageCollection over a specified FeatureCollection.
         Args:
             ic (ee.ImageCollection): The input ImageCollection for which to compute zonal statistics.
-            fc (ee.FeatureCollection): The FeatureCollection defining the zones over which to compute statistics.
+            fc (Optional[ee.FeatureCollection]): The FeatureCollection defining the zones. If not provided, 
+                                                 the default FeatureCollection (self.ee_featurecollection) is used.
         Returns:
-            ee.FeatureCollection: A FeatureCollection containing the computed statistics for each zone.
+            ee.FeatureCollection: A FeatureCollection containing the computed zonal statistics for each feature in the input FeatureCollection.
         """
+        if not fc: fc = self.ee_featurecollection
         def _get_stats(img: ee.Image) -> ee.FeatureCollection:
             img = ee.Image(img.set(self._params['datetimeName'], img.date().format(
                 self._params['datetimeFormat'])).set('timestamp', img.get('system:time_start')))
@@ -131,27 +133,22 @@ class GeoCogs:
                 crs=self._params['crs'],
                 tileScale=self._params['tileScale']
             ).map(lambda f: f.set(img_props))
-
         results = ic.map(_get_stats).flatten()
-
         return results
 
-    def class2area(self, image: ee.Image) -> ee.FeatureCollection:
+    def add_area_band(self, image: ee.Image) -> ee.Image:
         """
-        Computes the area of each class in an Earth Engine Image.
+        Adds an area band to the given Earth Engine image.
+        This method selects a specific band from the input image, calculates the pixel area,
+        and adds it as a new band named "area". It also retains the 'system:time_start' property
+        from the original image.
         Args:
-            image (ee.Image): The input Image for which to compute class areas.
+            image (ee.Image): The input Earth Engine image.
         Returns:
-            ee.FeatureCollection: A FeatureCollection containing the computed areas for each class.
+            ee.Image: The modified image with an additional "area" band.
         """
         image = image.select(self._params.get('select_band'))
-        area_image = ee.Image.pixelArea().rename("area").addBands(image)
-        return area_image.reduceRegions(
-            collection=self.ee_featurecollection,
-            reducer=ee.Reducer.sum().group(1, 'lulc_class'),
-            scale=self._params['scale'],
-            crs=self._params['crs']
-        )
+        return ee.Image.pixelArea().rename("area").addBands(image).set('system:time_start', image.get('system:time_start'))
 
     def export2drive(self, data: ee.FeatureCollection, filename: str) -> None:
         """

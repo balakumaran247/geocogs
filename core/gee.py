@@ -35,17 +35,25 @@ class ImageCollections:
         """
         return ee.ImageCollection(Assistant.read_json().get(self.parameter).get('id'))
 
-    def check_imagecollection(self, imagecollection: ee.ImageCollection) -> None:
+    def check_imagecollection(self, imagecollection: ee.ImageCollection) -> int:
         """
-        Checks the image collection for the given image collection and feedback.
+        Checks if the given image collection is empty.
 
         Args:
             imagecollection (ee.ImageCollection): The Earth Engine ImageCollection.
-            feedback (QgsProcessingFeedback): The feedback object.
+
+        Returns:
+            int: The number of images in the collection.
+
+        Raises:
+            QgsProcessingException: If no images are found in the collection.
         """
-        if not imagecollection.size().getInfo():
+        if count := imagecollection.size().getInfo():
+            return count
+        else:
             raise QgsProcessingException(
-                f'No images found in reduced {self.parameter} collection'
+                f'Zero images found in {self.parameter} collection \
+                    for the given time period'
             )
 
     @staticmethod
