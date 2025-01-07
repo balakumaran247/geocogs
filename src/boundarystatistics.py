@@ -75,8 +75,9 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             except Exception as e:
                 raise QgsProcessingException(Assistant.DISCLAIMER) from e
             Assistant._check_directory(kwargs['EXPORT_PATH'])
-            Assistant.export2csv(
-                stats, kwargs['EXPORT_PATH'], kwargs['SPATIALSTAT'], kwargs['INPUT_FIELD'], params['datetimeName'])
+            out_dict = Assistant.stat2dict(stats, kwargs['SPATIALSTAT'].lower(
+            ), kwargs['INPUT_FIELD'], params['datetimeName'])
+            Assistant.export2csv(out_dict, kwargs['EXPORT_PATH'])
             return {'Output': kwargs['EXPORT_PATH']}
         else:
             self.export2drive(get_stats, f'GeoCogs_{self.layer_name}')

@@ -54,7 +54,7 @@ class LulcStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, Geo
         Assistant.set_progressbar_perc(
             feedback, 20, 'Updating Metadata... (takes time)')
         self.update_metadata(f'{datetime.now():%Y-%m-%d}', feedback)
-        
+
         self.set_params(params)
         Assistant.set_progressbar_perc(
             feedback, 50, 'Converting Layer to EE FeatureCollection...')
@@ -67,8 +67,22 @@ class LulcStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, Geo
         self.check_imagecollection(ic_reduced)
         ic_area = ic_reduced.map(self.add_area_band)
         get_stats = self.zonal_stats(ic_area)
-        print(get_stats.getInfo()['features'][0]['properties'])
-        return kwargs
+        class_dict = Assistant.read_json()[kwargs.get('PARAMETER')]['class']
+        Assistant.set_progressbar_perc(
+            feedback, 80, 'Calculation & Exporting Data...')
+        if kwargs['EXPORT_TO'] == 'local':
+            try:
+                stats = get_stats.getInfo()
+            except Exception as e:
+                raise QgsProcessingException(Assistant.DISCLAIMER) from e
+            Assistant._check_directory(kwargs['EXPORT_PATH'])
+            out_dict = Assistant.stat2dict(
+                stats, 'groups', kwargs['INPUT_FIELD'], 'lulc_class', 'sum', class_dict)
+            Assistant.export2csv(out_dict, kwargs['EXPORT_PATH'])
+            return {'Output': kwargs['EXPORT_PATH']}
+        else:
+            self.export2drive(get_stats, f'GeoCogs_{self.layer_name}')
+            return Assistant.DRIVE_MSG
 
     def name(self):
         return 'lulc_stats'
