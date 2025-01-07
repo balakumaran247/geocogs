@@ -109,36 +109,66 @@ class Assistant:
             feedback.setProgressText(text)
 
     @staticmethod
-    def export2csv(data: Dict, filepath: str, reducer_key: str, unique_key: str, date_key: str) -> None:
-        """Export data to a CSV file.
-
-        Args:
-            data (Dict): The data to export.
-            filepath (str): The path where the CSV file will be saved.
-            reducer_key (str): The key used to reduce the data.
-            unique_key (str): The key used to uniquely identify each entry.
-            date_key (str): The key used to identify the date in the data.
+    def export2csv(data: Dict, filepath: str) -> None:
         """
-        reducer_key = reducer_key.lower()
+        Exports the given data to a CSV file.
+        Args:
+            data (Dict): The data to be exported, where keys are column names and values are lists of column values.
+            filepath (str): The path where the CSV file will be saved.
+        Returns:
+            None
+        """
+        df = pd.DataFrame(data).T
+        df.to_csv(filepath)
+
+    @staticmethod
+    def stat2dict(data: Dict, reducer_key: str, unique_key: str, column_key: str, column_value: Optional[str] = None, rename_key: Optional[Dict] = None) -> Dict:
+        """
+        Converts a list of features into a dictionary based on specified keys.
+        Args:
+            data (Dict): The input data containing features and their properties.
+            reducer_key (str): The key used to extract the value from the properties.
+            unique_key (str): The key used to identify unique features.
+            column_key (str): The key used to identify the column name in the properties.
+            column_value (Optional[str], optional): The key used to extract the value from the properties if the value is a list or tuple. Defaults to None.
+            rename_key (Optional[Dict], optional): A dictionary used to rename column keys. Defaults to None.
+        Raises:
+            QgsProcessingException: If the unique_key or reducer_key is not found in the properties.
+            QgsProcessingException: If the column_key or column_value is not found in the properties.
+        Returns:
+            Dict: A dictionary where the keys are unique feature names and the values are dictionaries of column names and their corresponding values.
+        """
         out_dict = {}
         for feature in data['features']:
             props = feature['properties']
             if (
-                date_key not in props
-                or unique_key not in props
+                unique_key not in props
                 or reducer_key not in props
             ):
                 raise QgsProcessingException(
-                    f'{date_key}, {unique_key}, or {reducer_key} not found in stats properties')
-            date = props[date_key]
+                    f'{unique_key} or {reducer_key} not found in stats properties')
             name = props[unique_key]
             val = props[reducer_key]
-            if name in out_dict:
-                out_dict[name][date] = val
+            if isinstance(val, (int, float, str)) and column_key in props:
+                column_name = props[column_key]
+                if name in out_dict:
+                    out_dict[name][column_name] = val
+                else:
+                    out_dict[name] = {column_name: val}
+            elif isinstance(val, (list, tuple)):
+                for i in val:
+                    column_name = str(i[column_key])
+                    if rename_key and column_name in rename_key:
+                        column_name = rename_key[column_name]
+                    data_values = i[column_value]
+                    if name in out_dict:
+                        out_dict[name][column_name] = data_values
+                    else:
+                        out_dict[name] = {column_name: data_values}
             else:
-                out_dict[name] = {date: val}
-        df = pd.DataFrame(out_dict).T
-        df.to_csv(filepath)
+                raise QgsProcessingException(
+                    f'{column_key} and {column_value} not found in stats properties')
+        return out_dict
 
     @staticmethod
     def default_path():
