@@ -49,26 +49,26 @@ class GeoCogsPlugin:
     def boundarystats_run(self):
         processing.execAlgorithmDialog("geocogs:boundary_stats")
 
-    # def lulcstats_init(self):
-    #     self.lulcstats_action = QAction(
-    #         QIcon(self.icon), "LULC Statistics", self.iface.mainWindow())
-    #     self.lulcstats_action.triggered.connect(self.lulcstats_run)
-    #     self.iface.addPluginToMenu(u"&GeoCogs", self.lulcstats_action)
+    def lulcstats_init(self):
+        self.lulcstats_action = QAction(
+            QIcon(self.icon), "LULC Statistics", self.iface.mainWindow())
+        self.lulcstats_action.triggered.connect(self.lulcstats_run)
+        self.iface.addPluginToMenu(u"&GeoCogs", self.lulcstats_action)
 
-    # def lulcstats_unload(self):
-    #     self.iface.removePluginMenu("&GeoCogs", self.lulcstats_action)
+    def lulcstats_unload(self):
+        self.iface.removePluginMenu("&GeoCogs", self.lulcstats_action)
 
-    # def lulcstats_run(self):
-    #     processing.execAlgorithmDialog("geocogs:lulc_stats")
+    def lulcstats_run(self):
+        processing.execAlgorithmDialog("geocogs:lulc_stats")
 
     def initGui(self):
         self.processing_provider_init()
         self.about_init()
         self.boundarystats_init()
-        # self.lulcstats_init()
+        self.lulcstats_init()
 
     def unload(self):
         self.processing_provider_unload()
         self.about_unload()
         self.boundarystats_unload()
-        # self.lulcstats_unload()
+        self.lulcstats_unload()

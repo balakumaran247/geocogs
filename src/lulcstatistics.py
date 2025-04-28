@@ -19,21 +19,20 @@ from ..core.helper import Assistant
 from ..core.process import GeoCogs
 
 
-class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, GeoCogs):
+class LulcStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers, GeoCogs):
     INPUT_PARAMS = 'INPUT_PARAMS'
 
     def initAlgorithm(self, config=None):
         param = QgsProcessingParameterMatrix(
-            self.INPUT_PARAMS, 'Boundary Statistics')
-        param.setMetadata({'widget_wrapper': {'class': BoundaryStatsWidget}})
+            self.INPUT_PARAMS, 'LULC Statistics')
+        param.setMetadata({'widget_wrapper': {'class': LulcStatsWidget}})
         self.addParameter(param)
 
     def processAlgorithm(self, parameters, context, feedback):
         user_options = self.parameterAsMatrix(
             parameters, self.INPUT_PARAMS, context)
         keys = ('INPUT_LAYER', 'SELECTED_FEATURES', 'INPUT_FIELD', 'PARAMETER', 'SPAN',
-                'TEMPORALSTEP', 'START_YEAR', 'END_YEAR', 'SPATIALSTAT', 'TEMPORALSTAT',
-                'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
+                'START_YEAR', 'SCALE', 'TILESCALE', 'EXPORT_TO', 'EXPORT_PATH')
         kwargs = dict(zip(keys, user_options))
 
         Assistant.set_progressbar_perc(
@@ -43,10 +42,10 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
         self.set_parameter(kwargs['PARAMETER'])
         params = {
             'select_band': self.band,
-            'temp_reducer': self.ee_reducer(kwargs['TEMPORALSTAT']),
-            'spat_reducer': self.ee_reducer(kwargs['SPATIALSTAT']),
             'scale': kwargs['SCALE'],
             'tileScale': kwargs['TILESCALE'],
+            'temp_reducer': ee.Reducer.mode(),
+            'spat_reducer': ee.Reducer.sum().group(1, 'lulc_class'),
             'crs': None,
             'datetimeName': 'date',
             'datetimeFormat': 'YYYY-MM'
@@ -62,11 +61,13 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
         self.layer2ee(kwargs['INPUT_LAYER'],
                       kwargs['SELECTED_FEATURES'], feedback)
         ic_reduced = self.reduce2imagecollection(self.ee_imagecollection, self.ee_featurecollection,
-                                                 kwargs['START_YEAR'], kwargs['END_YEAR'], kwargs['SPAN'], kwargs['TEMPORALSTEP'])
+                                                 kwargs['START_YEAR'], kwargs['START_YEAR'], kwargs['SPAN'], 'Yearly')
         Assistant.set_progressbar_perc(
             feedback, 60, 'Checking ImageCollection...')
         self.check_imagecollection(ic_reduced)
-        get_stats = self.zonal_stats(ic_reduced, self.ee_featurecollection)
+        ic_area = ic_reduced.map(self.add_area_band)
+        get_stats = self.zonal_stats(ic_area)
+        class_dict = Assistant.read_json()[kwargs.get('PARAMETER')]['class']
         Assistant.set_progressbar_perc(
             feedback, 80, 'Calculation & Exporting Data...')
         if kwargs['EXPORT_TO'] == 'local':
@@ -75,8 +76,8 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             except Exception as e:
                 raise QgsProcessingException(Assistant.DISCLAIMER) from e
             Assistant._check_directory(kwargs['EXPORT_PATH'])
-            out_dict = Assistant.stat2dict(stats, kwargs['SPATIALSTAT'].lower(
-            ), kwargs['INPUT_FIELD'], params['datetimeName'])
+            out_dict = Assistant.stat2dict(
+                stats, 'groups', kwargs['INPUT_FIELD'], 'lulc_class', 'sum', class_dict)
             Assistant.export2csv(out_dict, kwargs['EXPORT_PATH'])
             return {'Output': kwargs['EXPORT_PATH']}
         else:
@@ -84,10 +85,10 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
             return Assistant.DRIVE_MSG
 
     def name(self):
-        return 'boundary_stats'
+        return 'lulc_stats'
 
     def displayName(self):
-        return self.tr('Boundary Statistics')
+        return self.tr('LULC Statistics')
 
     def group(self):
         return self.tr(self.groupId())
@@ -103,12 +104,12 @@ class BoundaryStatsAlgorithm(QgsProcessingAlgorithm, ImageCollections, Reducers,
         return QIcon(os.path.join(os.path.join(os.path.dirname(cmd_folder), 'icon.png')))
 
     def createInstance(self):
-        return BoundaryStatsAlgorithm()
+        return LulcStatsAlgorithm()
 
 
-class BoundaryStatsWidget(WidgetWrapper):
+class LulcStatsWidget(WidgetWrapper):
     """
-    A widget wrapper class for boundary statistics.
+    A widget wrapper class for LULC statistics.
     Methods
     -------
     createWidget():
@@ -127,32 +128,23 @@ class BoundaryStatsWidget(WidgetWrapper):
         source_field = self.custom_widget.fld_cb.currentField()
         parameter = self.custom_widget.parm_cb.currentText()
         span = self.custom_widget.span_cb.currentText()
-        step = self.custom_widget.step_cb.currentText()
         start_year = self.custom_widget.start_year_int.value()
-        end_year = self.custom_widget.end_year_int.value()
-        spatial_reducer = self.custom_widget.spatial_cb.currentText()
-        temporal_reducer = self.custom_widget.temporal_cb.currentText()
         scale = self.custom_widget.scale_int.value()
         tilescale = int(self.custom_widget.tilescale_cb.currentText())
         export_to = self.custom_widget.export_option
         export_path = self.custom_widget.export_ln.text()
         return [
-            source_layer, selected_features, source_field, parameter, span, step,
-            start_year, end_year, spatial_reducer, temporal_reducer, scale,
-            tilescale, export_to, export_path
+            source_layer, selected_features, source_field, parameter, span,
+            start_year, scale, tilescale, export_to, export_path
         ]
-
-# https://gis.stackexchange.com/questions/465952/how-to-chose-a-vector-layer-chose-a-field-then-chose-values-using-parameterase
 
 
 class customParametersWidget(QWidget):
     """
-    A custom widget for selecting parameters and options for boundary statistics in QGIS.
+    A custom widget for selecting parameters and options for LULC statistics in QGIS.
     Attributes:
         PARAMETERS (list): List of available parameters for selection.
         SPANOPTIONS (list): List of span options for selection.
-        STEPOPTIONS (list): List of step options for selection.
-        REDUCERS (list): List of reducers for spatial and temporal reduction.
         TILESCALE (list): List of tile scale options.
         DEFAULT_PATH (str): Default path for exporting data.
         IMAGECOLLECTION_JSON (dict): JSON data containing image collection information.
@@ -165,14 +157,9 @@ class customParametersWidget(QWidget):
         layer_changed(lyr): Updates the field combo box based on the selected layer.
     """
     PARAMETERS = [
-        'IMD Rainfall',
-        'IMD Max Temperature',
-        'IMD Min Temperature',
-        'ETa SSEBop'
+        'Dynamic World V1'
     ]
     SPANOPTIONS = ['Calendar Year', 'Hydrological Year']
-    STEPOPTIONS = ['Monthly', 'Yearly']
-    REDUCERS = ['Mean', 'Median', 'Max', 'Min', 'Mode', 'Sum']
     TILESCALE = ["1", "2", "4"]
     DEFAULT_PATH = Assistant.default_path()
     IMAGECOLLECTION_JSON = Assistant.read_json()
@@ -197,32 +184,15 @@ class customParametersWidget(QWidget):
         self.span_cb.addItems(self.SPANOPTIONS)
         self.span_cb.currentIndexChanged.connect(self.set_min_max_dates)
 
-        self.step_lb1 = QLabel('Select Step:')
-        self.step_cb = QComboBox(self)
-        self.step_cb.addItems(self.STEPOPTIONS)
-
         self.fld_lbl = QLabel('Select Unique Field:')
         self.fld_cb = QgsFieldComboBox(self)
         self.fld_cb.setLayer(self.lyr_cb.currentLayer())
 
-        self.start_year_lb1 = QLabel('Start Year:')
+        self.start_year_lb1 = QLabel('Year:')
         self.start_year_int = QSpinBox(self)
         self.start_year_int.setSingleStep(1)
         self.start_year_int.setWrapping(True)
         self.start_year_int.valueChanged.connect(self.set_min_max_dates)
-
-        self.end_year_lb1 = QLabel('End Year:')
-        self.end_year_int = QSpinBox(self)
-        self.end_year_int.setSingleStep(1)
-        self.end_year_int.setWrapping(True)
-
-        self.spatial_lb1 = QLabel('Spatial Reducer:')
-        self.spatial_cb = QComboBox(self)
-        self.spatial_cb.addItems(self.REDUCERS)
-
-        self.temporal_lb1 = QLabel('Temporal Reducer:')
-        self.temporal_cb = QComboBox(self)
-        self.temporal_cb.addItems(self.REDUCERS)
 
         self.scale_lb1 = QLabel('Scale (optional):')
         self.scale_int = QSpinBox(self)
@@ -253,30 +223,22 @@ class customParametersWidget(QWidget):
         self.layout.addWidget(self.lyr_cb, 0, 1, 1, 2)
         self.layout.addWidget(self.onlyselected_cb, 0, 3, 1, 1)
         self.layout.addWidget(self.fld_lbl, 1, 0, 1, 1)
-        self.layout.addWidget(self.fld_cb, 1, 1, 1, 1)
-        self.layout.addWidget(self.parm_lbl, 1, 2, 1, 1)
-        self.layout.addWidget(self.parm_cb, 1, 3, 1, 1)
-        self.layout.addWidget(self.span_lb1, 2, 0, 1, 1)
-        self.layout.addWidget(self.span_cb, 2, 1, 1, 1)
-        self.layout.addWidget(self.step_lb1, 2, 2, 1, 1)
-        self.layout.addWidget(self.step_cb, 2, 3, 1, 1)
-        self.layout.addWidget(self.start_year_lb1, 3, 0, 1, 1)
-        self.layout.addWidget(self.start_year_int, 3, 1, 1, 1)
-        self.layout.addWidget(self.end_year_lb1, 3, 2, 1, 1)
-        self.layout.addWidget(self.end_year_int, 3, 3, 1, 1)
-        self.layout.addWidget(self.spatial_lb1, 4, 0, 1, 1)
-        self.layout.addWidget(self.spatial_cb, 4, 1, 1, 1)
-        self.layout.addWidget(self.temporal_lb1, 4, 2, 1, 1)
-        self.layout.addWidget(self.temporal_cb, 4, 3, 1, 1)
-        self.layout.addWidget(self.scale_lb1, 5, 0, 1, 1)
-        self.layout.addWidget(self.scale_int, 5, 1, 1, 1)
-        self.layout.addWidget(self.tilescale_lb1, 5, 2, 1, 1)
-        self.layout.addWidget(self.tilescale_cb, 5, 3, 1, 1)
-        self.layout.addWidget(self.export_lb1, 6, 0, 1, 1)
-        self.layout.addWidget(self.export_rb1, 6, 1, 1, 1)
-        self.layout.addWidget(self.export_rb2, 6, 2, 1, 1)
-        self.layout.addWidget(self.export_ln, 7, 0, 1, 3)
-        self.layout.addWidget(self.export_btn, 7, 3, 1, 1)
+        self.layout.addWidget(self.fld_cb, 1, 1, 1, 2)
+        self.layout.addWidget(self.parm_lbl, 2, 0, 1, 1)
+        self.layout.addWidget(self.parm_cb, 2, 1, 1, 1)
+        self.layout.addWidget(self.span_lb1, 3, 0, 1, 1)
+        self.layout.addWidget(self.span_cb, 3, 1, 1, 1)
+        self.layout.addWidget(self.start_year_lb1, 3, 2, 1, 1)
+        self.layout.addWidget(self.start_year_int, 3, 3, 1, 1)
+        self.layout.addWidget(self.scale_lb1, 4, 0, 1, 1)
+        self.layout.addWidget(self.scale_int, 4, 1, 1, 1)
+        self.layout.addWidget(self.tilescale_lb1, 4, 2, 1, 1)
+        self.layout.addWidget(self.tilescale_cb, 4, 3, 1, 1)
+        self.layout.addWidget(self.export_lb1, 5, 0, 1, 1)
+        self.layout.addWidget(self.export_rb1, 5, 1, 1, 1)
+        self.layout.addWidget(self.export_rb2, 5, 2, 1, 1)
+        self.layout.addWidget(self.export_ln, 6, 0, 1, 3)
+        self.layout.addWidget(self.export_btn, 6, 3, 1, 1)
 
         self.setLayout(self.layout)
 
@@ -324,9 +286,6 @@ class customParametersWidget(QWidget):
             end = self.IMAGECOLLECTION_JSON[parameter]['hydrological_end']
         self.start_year_int.setMinimum(start)
         self.start_year_int.setMaximum(end)
-        self.end_year_int.setMinimum(self.start_year_int.value())
-        self.end_year_int.setValue(self.start_year_int.value())
-        self.end_year_int.setMaximum(end)
 
     def browse(self) -> None:
         """

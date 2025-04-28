@@ -5,8 +5,7 @@ from qgis.core import QgsProcessingProvider
 from qgis.PyQt.QtGui import QIcon
 
 from .boundarystatistics import BoundaryStatsAlgorithm
-
-# from .dwlulcstatistics import LulcStatsAlgorithm
+from .lulcstatistics import LulcStatsAlgorithm
 
 
 class ToolProvider(QgsProcessingProvider):
@@ -19,7 +18,7 @@ class ToolProvider(QgsProcessingProvider):
 
     def loadAlgorithms(self):
         self.addAlgorithm(BoundaryStatsAlgorithm())
-        # self.addAlgorithm(LulcStatsAlgorithm())
+        self.addAlgorithm(LulcStatsAlgorithm())
         # add additional algorithms here
         # self.addAlgorithm(MyOtherAlgorithm())
 
